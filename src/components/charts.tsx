@@ -1,0 +1,135 @@
+"use client";
+import {
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Line,
+  LineChart,
+  ReferenceLine,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+  type TooltipContentProps,
+} from "recharts";
+import { CATEGORIES, type Category } from "@/lib/constants";
+
+const AXIS = { stroke: "#8a8984", fontSize: 11, tickLine: false, axisLine: false } as const;
+const SURFACE = "#161618";
+const CATS = Object.keys(CATEGORIES) as Category[];
+
+function Box({ title, rows }: { title: string; rows: { label: string; value: string; color?: string }[] }) {
+  return (
+    <div className="rounded-xl border border-line bg-surface-2 px-3 py-2 text-xs shadow-xl">
+      <div className="mb-1 font-semibold text-ink">{title}</div>
+      {rows.map((r) => (
+        <div key={r.label} className="flex items-center gap-2 text-ink-2">
+          {r.color && <span className="h-2.5 w-2.5 rounded-sm" style={{ background: r.color }} />}
+          <span>{r.label}</span>
+          <span className="ml-auto pl-3 font-mono text-ink tabular-nums">{r.value}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+export type WeekDatum = { label: string; force: number; cardio: number; mobilite: number; sessions: number };
+
+export function WeeklyChart({ data }: { data: WeekDatum[] }) {
+  return (
+    <div>
+      <div className="mb-3 flex flex-wrap gap-3 text-xs text-ink-2">
+        {CATS.map((c) => (
+          <span key={c} className="flex items-center gap-1.5">
+            <span className="h-2.5 w-2.5 rounded-sm" style={{ background: CATEGORIES[c].color }} />
+            {CATEGORIES[c].label}
+          </span>
+        ))}
+        <span className="flex items-center gap-1.5 text-muted">
+          <span className="h-px w-4 border-t border-dashed border-muted" /> 150 min OMS
+        </span>
+      </div>
+      <div className="h-56">
+        <ResponsiveContainer width="100%" height="100%">
+          <BarChart data={data} margin={{ top: 8, right: 4, left: 0, bottom: 0 }} barCategoryGap="22%">
+            <CartesianGrid vertical={false} stroke="#2a2a2e" />
+            <XAxis dataKey="label" {...AXIS} interval="preserveStartEnd" />
+            <YAxis {...AXIS} width={36} />
+            <ReferenceLine y={150} stroke="#8a8984" strokeDasharray="4 4" />
+            <Tooltip
+              cursor={{ fill: "rgba(255,255,255,0.04)" }}
+              content={({ active, payload, label }: TooltipContentProps) =>
+                active && payload?.length ? (
+                  <Box
+                    title={`Semaine du ${label}`}
+                    rows={[
+                      ...CATS.map((c) => ({
+                        label: CATEGORIES[c].label,
+                        value: `${payload[0].payload[c]} min`,
+                        color: CATEGORIES[c].color,
+                      })),
+                      { label: "Séances", value: String(payload[0].payload.sessions) },
+                    ]}
+                  />
+                ) : null
+              }
+            />
+            {CATS.map((c, i) => (
+              <Bar
+                key={c}
+                dataKey={c}
+                stackId="a"
+                fill={CATEGORIES[c].color}
+                stroke={SURFACE}
+                strokeWidth={2}
+                radius={i === CATS.length - 1 ? [4, 4, 0, 0] : 0}
+                isAnimationActive={false}
+              />
+            ))}
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
+    </div>
+  );
+}
+
+export function WeightChart({ data, target }: { data: { label: string; weight: number; avg: number }[]; target?: number | null }) {
+  const vals = data.flatMap((d) => [d.weight, d.avg]).concat(target ? [target] : []);
+  const min = Math.floor(Math.min(...vals) - 1);
+  const max = Math.ceil(Math.max(...vals) + 1);
+  return (
+    <div>
+      <div className="mb-3 flex flex-wrap gap-3 text-xs text-ink-2">
+        <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-[#3987e5]/60" /> Pesée</span>
+        <span className="flex items-center gap-1.5"><span className="h-0.5 w-4 bg-accent" /> Moyenne 7 j</span>
+        {target ? <span className="flex items-center gap-1.5 text-muted"><span className="w-4 border-t border-dashed border-muted" /> Objectif</span> : null}
+      </div>
+      <div className="h-56">
+        <ResponsiveContainer width="100%" height="100%">
+          <LineChart data={data} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+            <CartesianGrid vertical={false} stroke="#2a2a2e" />
+            <XAxis dataKey="label" {...AXIS} interval="preserveStartEnd" minTickGap={24} />
+            <YAxis {...AXIS} domain={[min, max]} width={36} />
+            {target ? <ReferenceLine y={target} stroke="#8a8984" strokeDasharray="4 4" /> : null}
+            <Tooltip
+              cursor={{ stroke: "#8a8984", strokeWidth: 1 }}
+              content={({ active, payload, label }: TooltipContentProps) =>
+                active && payload?.length ? (
+                  <Box
+                    title={String(label)}
+                    rows={[
+                      { label: "Pesée", value: `${payload[0].payload.weight.toFixed(1)} kg`, color: "#3987e5" },
+                      { label: "Moy. 7 j", value: `${payload[0].payload.avg.toFixed(1)} kg`, color: "#c6f432" },
+                    ]}
+                  />
+                ) : null
+              }
+            />
+            <Line dataKey="weight" stroke="transparent" dot={{ r: 4, fill: "#3987e5", fillOpacity: 0.6, stroke: SURFACE, strokeWidth: 2 }} activeDot={{ r: 6 }} isAnimationActive={false} />
+            <Line dataKey="avg" stroke="#c6f432" strokeWidth={2} dot={false} type="monotone" isAnimationActive={false} />
+          </LineChart>
+        </ResponsiveContainer>
+      </div>
+    </div>
+  );
+}
