@@ -7,6 +7,7 @@ import { getPasskeys, getPushSubscriptions } from "@/lib/data";
 import { pushConfigured, vapidPublicKey } from "@/lib/push";
 import { scriptableWidget } from "@/lib/scriptable";
 import { fmtDate } from "@/lib/dates";
+import { WORKOUT_TYPES } from "@/lib/constants";
 import { deletePasskey, generateApiToken, revokeApiToken, saveNotificationPrefs } from "@/app/apple-actions";
 import { PageHeader } from "@/components/ui";
 import { CopyButton } from "@/components/copy-button";
@@ -40,6 +41,15 @@ function Recipe({ title, open, children }: { title: string; open?: boolean; chil
 }
 
 const Steps = ({ children }: { children: ReactNode }) => <ol className="list-decimal space-y-2 pl-5">{children}</ol>;
+
+/** Valeurs acceptées pour le champ `type` (les noms Apple FR/EN le sont aussi) */
+const TypeList = () => (
+  <span className="inline-flex flex-wrap gap-1 align-middle">
+    {WORKOUT_TYPES.map((t) => (
+      <Code key={t.id}>{t.id}</Code>
+    ))}
+  </span>
+);
 
 export default async function Integrations() {
   const me = await requireProfile();
@@ -105,7 +115,7 @@ export default async function Integrations() {
         </div>
 
         <div className="space-y-3">
-          <Recipe title="⌚ Séances Apple Watch — début / fin (recommandé, marche partout)" open>
+          <Recipe title="⌚ Avec Apple Watch — début / fin automatiques" open>
             <Steps>
               <li>
                 Raccourcis › <b>Automatisation</b> › <b>+</b> › <b>Exercice Apple Watch</b> › Lorsque l&apos;exercice : <b>Commence</b> › <b>N&apos;importe quel exercice</b> › <b>Exécuter immédiatement</b>.
@@ -119,14 +129,43 @@ export default async function Integrations() {
             </Steps>
             <p>
               <b>Type de séance</b> : sans précision, elle est rangée en « Cardio (autre) » (modifiable dans l&apos;app). Pour un type juste, fais plutôt une automatisation <b>Commence</b> par sport (filtre du déclencheur) avec un champ <Code>type</Code> :{" "}
-              <Code>course</Code> <Code>velo</Code> <Code>natation</Code> <Code>marche</Code> <Code>muscu</Code> <Code>crossfit</Code> <Code>hiit</Code> <Code>yoga</Code> <Code>boxe</Code>… Une seule automatisation <b>Se termine</b> suffit.
+              <TypeList />. Une seule automatisation <b>Se termine</b> suffit.
             </p>
             <p className="text-xs text-muted">Durée calculée entre les deux signaux · calories estimées (MET × ton dernier poids) · RPE 6 par défaut. Au 1ᵉʳ lancement, iOS demande d&apos;autoriser l&apos;accès réseau.</p>
           </Recipe>
 
-          <Recipe title="📋 Variante : séance complète (si « Entraînements » est proposé)">
+          <Recipe title="📱 Sans Apple Watch — « Je commence » / « J'ai fini » (Siri)">
+            <Steps>
+              <li>
+                Raccourcis › onglet <b>Raccourcis</b> › <b>+</b> › nomme-le <b>Je commence</b>. Action <b>Choisir dans le menu</b> avec tes sports (Course, Muscu, Vélo…) ; dans chaque option, une action <b>Texte</b> contenant le type : <TypeList />.
+              </li>
+              <li>
+                Après le menu : <b>Obtenir le contenu de l&apos;URL</b> : <Code>{workoutsUrl}</Code>, <b>POST</b>, en-tête <Code>Authorization</Code> = <Code>{auth}</Code>, JSON : <Code>event</Code> = <Code>start</Code> et <Code>type</Code> = <b>Résultat du menu</b>.
+              </li>
+              <li>
+                2ᵉ raccourci <b>J&apos;ai fini</b> : même URL et en-tête, JSON <Code>event</Code> = <Code>end</Code>, puis <b>Obtenir la valeur du dictionnaire</b> (clé <Code>message</Code>) › <b>Afficher la notification</b>.
+              </li>
+            </Steps>
             <p>
-              Dans l&apos;automatisation <b>Se termine</b>, ajoute avant l&apos;envoi <b>Rechercher des échantillons de santé</b> (Type <b>Entraînements</b>, Trier par <b>Date de début</b>, <b>Plus récent d&apos;abord</b>, Limite <b>1</b>), puis envoie en JSON :
+              Lance-les avec <b>« Dis Siri, je commence »</b> / <b>« Dis Siri, j&apos;ai fini »</b>, depuis l&apos;écran d&apos;accueil (partage › <b>Sur l&apos;écran d&apos;accueil</b>) ou le <b>bouton Action</b> de l&apos;iPhone.
+            </p>
+            <p className="text-xs text-muted">Durée calculée entre les deux (6 h max) · calories estimées avec ton dernier poids · RPE 6 par défaut, modifiable dans l&apos;app.</p>
+          </Recipe>
+
+          <Recipe title="⚡ Sans Apple Watch — enregistrement rapide après la séance">
+            <Steps>
+              <li>Nouveau raccourci <b>Séance FitPulse</b> : <b>Choisir dans le menu</b> + actions <b>Texte</b> pour le type (comme ci-dessus).</li>
+              <li><b>Demander une entrée</b> (type <b>Nombre</b>) : « Durée en minutes ? ». Facultatif : une 2ᵉ pour la distance en km.</li>
+              <li>
+                <b>Obtenir le contenu de l&apos;URL</b> : <Code>{workoutsUrl}</Code>, POST, même en-tête, JSON : <Code>type</Code> = Résultat du menu, <Code>durationMin</Code> = Entrée fournie (et <Code>distanceKm</Code>), puis <b>Afficher la notification</b> avec <Code>message</Code>.
+              </li>
+            </Steps>
+            <p className="text-xs text-muted">La séance est datée comme venant de se terminer. « Dis Siri, séance FitPulse » suffit ensuite.</p>
+          </Recipe>
+
+          <Recipe title="📋 Variante : séance complète lue dans Santé (si « Entraînements » est proposé)">
+            <p>
+              Utile avec la Watch, ou si une autre app (Strava, Nike Run Club…) enregistre tes séances dans Santé : dans l&apos;automatisation <b>Se termine</b> — ou une automatisation quotidienne <b>Heure de la journée</b> — ajoute avant l&apos;envoi <b>Rechercher des échantillons de santé</b> (Type <b>Entraînements</b>, Trier par <b>Date de début</b>, <b>Plus récent d&apos;abord</b>, Limite <b>1</b>), puis envoie en JSON :
             </p>
             <ul className="list-disc space-y-1 pl-5">
               <li><Code>type</Code> : nom de l&apos;entraînement (« Course en extérieur », « Musculation traditionnelle »… reconnus en FR/EN)</li>
