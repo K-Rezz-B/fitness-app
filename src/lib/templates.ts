@@ -146,8 +146,11 @@ export function templateToExercises(t: Template): Exercise[] {
   }));
 }
 
-/** Choisit la prochaine catégorie pour varier l'entraînement */
-export function suggest(recent: Workout[], weeklyTarget: number): { template: Template; reason: string } {
+/**
+ * Choisit la prochaine catégorie pour varier l'entraînement.
+ * `available` : programmes faisables par le profil (matériel, sports, niveau).
+ */
+export function suggest(recent: Workout[], weeklyTarget: number, available: Template[] = TEMPLATES): { template: Template; reason: string } {
   const t = today();
   const ws = weekStart(t);
   const thisWeek = recent.filter((w) => dayKey(w.date) >= ws);
@@ -182,7 +185,8 @@ export function suggest(recent: Workout[], weeklyTarget: number): { template: Te
   }
 
   // évite le type pratiqué en dernier si possible, rotation déterministe par jour
-  const pool = TEMPLATES.filter((tp) => typeInfo(tp.type).category === cat);
+  const inCat = (list: Template[]) => list.filter((tp) => typeInfo(tp.type).category === cat);
+  const pool = inCat(available).length ? inCat(available) : inCat(TEMPLATES);
   const notLast = pool.filter((tp) => tp.type !== recent[0]?.type);
   const candidates = notLast.length ? notLast : pool;
   const seed = Number(t.replaceAll("-", ""));

@@ -4,8 +4,9 @@ import { getActivity, getPlans, getVideos, getWorkouts } from "@/lib/data";
 import { requireProfile } from "@/lib/session";
 import { computeStats } from "@/lib/stats";
 import { suggest, templateById } from "@/lib/templates";
-import { typeInfo } from "@/lib/constants";
-import { addDays, dayKey, fmtDate, isoWeekday, today } from "@/lib/dates";
+import { WEEKDAYS, typeInfo } from "@/lib/constants";
+import { addDays, dayKey, fmtDate, fmtTime, isoWeekday, today } from "@/lib/dates";
+import { templatesForProfile, upcomingPlan } from "@/lib/coach-plan";
 import { PageHeader, Progress, Stat } from "@/components/ui";
 import { ActivityRings, Heatmap, ScoreRing, SplitBar, StepsBars } from "@/components/viz";
 import { WeeklyChart } from "@/components/charts";
@@ -26,20 +27,34 @@ export default async function Dashboard({ searchParams }: PageProps<"/">) {
   const target = profile.weeklySessionsTarget;
   const s = computeStats(all, target);
   const t = today();
-  const suggested = suggest(all.slice(0, 20), target);
   const planHref = (p: (typeof plans)[number]) =>
     p.source === "coach" && p.templateId ? `/workouts/new?plan=${p.id}` : `/workouts/new?type=${p.type}&title=${encodeURIComponent(p.title)}&duration=${p.durationMin}`;
-  const video = videos.find((v) => v.type === template.type) ?? videos.find((v) => v.tags.some((tag) => typeInfo(template.type).label.toLowerCase().includes(tag)));
-  const todayPlans = plans.filter((p) => p.active && p.weekday === isoWeekday(t));
+  const wd = isoWeekday(t);
+  const todayPlans = plans.filter((p) => p.active && p.weekday === wd);
   const doneToday = all.filter((w) => dayKey(w.date) === t);
-  // Séance du coach prévue aujourd'hui et pas encore faite → c'est elle la suggestion
+
+  // ---- Carte du jour : séance du coach > jour de récup du programme > suggestion faisable avec ton matériel ----
+  const coachPlans = plans.filter((p) => p.source === "coach" && p.active);
   const coachToday = todayPlans.find(
     (p) => p.source === "coach" && p.templateId && !doneToday.some((w) => typeInfo(w.type).category === typeInfo(p.type).category),
   );
   const coachTpl = coachToday ? templateById(coachToday.templateId!) : undefined;
-  const template = coachTpl ?? suggested.template;
-  const reason = coachTpl ? `Prévue aujourd'hui par ton coach (${coachToday!.time}) · ${coachToday!.notes ?? ""}` : suggested.reason;
+  const restDay = !coachTpl && coachPlans.length > 0; // programme actif mais rien (ou plus rien) à faire aujourd'hui
+  const next = restDay ? upcomingPlan(coachPlans, wd, fmtTime(new Date())) : undefined;
+  const nextLabel = next
+    ? `${next.inDays === 0 ? "aujourd'hui" : next.inDays === 1 ? "demain" : WEEKDAYS[next.plan.weekday - 1].toLowerCase()} ${next.plan.time} · ${next.plan.title}`
+    : null;
+  const { list: doable, known: equipmentKnown } = templatesForProfile(profile);
+  const suggested = suggest(all.slice(0, 20), target, doable);
+  const template = coachTpl ?? (restDay ? templateById("mobility")! : suggested.template);
+  const cardTitle = coachTpl ? "Séance du jour · coach" : restDay ? (doneToday.length ? "Séance du jour faite ✅" : "Jour de récupération 😌") : "Séance suggérée";
+  const reason = coachTpl
+    ? `Prévue aujourd'hui par ton coach (${coachToday!.time}) · ${coachToday!.notes ?? ""}`
+    : restDay
+      ? `${doneToday.length ? "Bien joué ! " : "Ton coach n'a rien prévu aujourd'hui : la récupération fait partie du programme. "}${nextLabel ? `Prochaine séance : ${nextLabel}. ` : ""}Une mobilité douce reste possible si tu en as envie.`
+      : suggested.reason;
   const startHref = coachToday && coachTpl ? `/workouts/new?plan=${coachToday.id}` : `/workouts/new?template=${template.id}`;
+  const video = videos.find((v) => v.type === template.type) ?? videos.find((v) => v.tags.some((tag) => typeInfo(template.type).label.toLowerCase().includes(tag)));
   const quote = QUOTES[Number(t.replaceAll("-", "")) % QUOTES.length];
 
   const weekData = s.weeks.map((w) => ({
@@ -129,7 +144,7 @@ export default async function Dashboard({ searchParams }: PageProps<"/">) {
         {/* Suggestion */}
         <section className="card lg:col-span-2">
           <div className="mb-3 flex items-center gap-2 text-sm font-semibold">
-            <Sparkles size={16} className="text-accent" /> {coachTpl ? "Séance du jour · coach" : "Séance suggérée"}
+            <Sparkles size={16} className="text-accent" /> {cardTitle}
           </div>
           <div className="text-3xl">{typeInfo(template.type).emoji}</div>
           <h3 className="mt-2 text-lg font-bold">{template.title}</h3>
@@ -144,13 +159,26 @@ export default async function Dashboard({ searchParams }: PageProps<"/">) {
             ))}
           </ul>
           <div className="mt-4 flex flex-wrap gap-2">
-            <Link href={startHref} className="btn-primary">C&apos;est parti</Link>
+            {restDay ? (
+              <>
+                <Link href="/planning#coach" className="btn-primary">Voir le programme</Link>
+                <Link href={startHref} className="btn-ghost">Mobilité {template.durationMin} min (facultatif)</Link>
+              </>
+            ) : (
+              <Link href={startHref} className="btn-primary">C&apos;est parti</Link>
+            )}
             {video && (
               <a href={video.url} target="_blank" rel="noreferrer" className="btn-ghost">
                 <PlayCircle size={16} /> Vidéo
               </a>
             )}
           </div>
+          {!coachTpl && !restDay && !equipmentKnown && (
+            <p className="mt-3 text-xs text-muted">
+              Suggestions sans matériel pour l&apos;instant.{" "}
+              <Link href="/planning#coach" className="text-accent">Indique ton matériel</Link> (salle, haltères…) pour des séances adaptées.
+            </p>
+          )}
         </section>
 
         {/* Graph semaines */}

@@ -2,7 +2,7 @@
 // Règles : OMS 2020 (≥ 2 renforcements/sem, 150-300 min), 48 h entre deux séances des mêmes muscles,
 // pas d'intensité la veille des jambes, cycle de 4 semaines (3 de progression + 1 de décharge),
 // semaine allégée si la charge grimpe trop (ACWR > 1,3, Gabbett 2016) ou si la semaine passée a été ratée.
-import { templateById, type Template } from "./templates";
+import { TEMPLATES, templateById, type Template } from "./templates";
 import { typeInfo } from "./constants";
 import type { Exercise, Workout } from "./schema";
 import { addDays, dayKey } from "./dates";
@@ -199,6 +199,30 @@ const WHY: Record<Kind, string> = {
   long: "Sortie longue le week-end : endurance",
   mobility: "Mobilité : amplitude et récupération active",
 };
+
+// ---------- programmes compatibles avec le profil (matériel, sports, niveau) ----------
+type Needs = "gym" | "dumbbells" | "none" | "bike" | "pool" | "bag";
+const NEEDS: Record<string, Needs> = {
+  "fullbody-a": "gym", "fullbody-b": "gym", push: "gym", pull: "gym", legs: "gym", upper: "gym", "upper-b": "gym", "lower-b": "gym",
+  emom: "gym", wod: "gym", // kettlebell, barre de traction
+  "db-fullbody-a": "dumbbells", "db-fullbody-b": "dumbbells", "db-upper": "dumbbells", "db-lower": "dumbbells",
+  "velo-z2": "bike", "velo-sst": "bike", nage: "pool", boxe: "bag",
+};
+const HARD = new Set(["fractionne", "tabata", "emom", "wod", "velo-sst"]);
+
+/** Programmes faisables avec ce matériel (la salle permet tout, les haltères permettent aussi le poids du corps). */
+export function templatesFor(o: { equipment: Equipment; sports: string[]; level: Level }): Template[] {
+  return TEMPLATES.filter((t) => {
+    const n = NEEDS[t.id] ?? "none";
+    if (o.level === "beginner" && HARD.has(t.id)) return false;
+    if (n === "gym") return o.equipment === "gym";
+    if (n === "dumbbells") return o.equipment !== "bodyweight";
+    if (n === "bike") return o.sports.includes("velo") || o.equipment === "gym";
+    if (n === "pool") return o.sports.includes("natation");
+    if (n === "bag") return o.sports.includes("boxe");
+    return true;
+  });
+}
 
 export const cleanDays = (days: number[]) => [...new Set(days)].filter((d) => Number.isInteger(d) && d >= 1 && d <= 7).sort((a, b) => a - b);
 
