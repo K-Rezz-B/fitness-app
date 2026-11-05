@@ -51,7 +51,7 @@ const VTIMEZONES: Record<string, string[]> = {
   ],
 };
 
-export function buildCalendar(plans: Plan[], tz: string, appUrl?: string): string {
+export function buildCalendar(plans: Plan[], tz: string, appUrl?: string, owner?: string): string {
   const t = today();
   const vtz = VTIMEZONES[tz];
   const dt = (name: string, value: string) => (vtz ? `${name};TZID=${tz}:${value}` : `${name}:${value}`);
@@ -61,7 +61,7 @@ export function buildCalendar(plans: Plan[], tz: string, appUrl?: string): strin
     "PRODID:-//FitPulse//Planning//FR",
     "CALSCALE:GREGORIAN",
     "METHOD:PUBLISH",
-    "X-WR-CALNAME:🏋️ Séances FitPulse",
+    `X-WR-CALNAME:${esc(`🏋️ Séances FitPulse${owner ? ` · ${owner}` : ""}`)}`,
     ...(vtz ? [`X-WR-TIMEZONE:${tz}`] : []),
     "REFRESH-INTERVAL;VALUE=DURATION:PT1H",
     "X-PUBLISHED-TTL:PT1H",

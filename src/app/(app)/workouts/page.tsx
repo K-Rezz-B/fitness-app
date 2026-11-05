@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { ChevronRight, Plus } from "lucide-react";
 import { getWorkouts } from "@/lib/data";
+import { requireProfile } from "@/lib/session";
 import { CATEGORIES, typeInfo } from "@/lib/constants";
 import { dayKey, fmtDate, fmtTime, weekStart } from "@/lib/dates";
 import { Empty, PageHeader } from "@/components/ui";
@@ -9,7 +10,7 @@ import { Empty, PageHeader } from "@/components/ui";
 export const metadata: Metadata = { title: "Séances" };
 
 export default async function Workouts() {
-  const all = await getWorkouts();
+  const all = await getWorkouts((await requireProfile()).id);
   const groups = new Map<string, typeof all>();
   for (const w of all) {
     const k = weekStart(dayKey(w.date));

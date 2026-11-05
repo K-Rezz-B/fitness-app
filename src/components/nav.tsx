@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, Dumbbell, CalendarClock, PlaySquare, Brain, Plus, UserRound } from "lucide-react";
+import { Home, Dumbbell, CalendarClock, PlaySquare, Brain, Plus, UserRound, ArrowLeftRight } from "lucide-react";
 import clsx from "clsx";
 
 const ITEMS = [
@@ -14,7 +14,7 @@ const ITEMS = [
 
 const active = (path: string, href: string) => (href === "/" ? path === "/" : path.startsWith(href));
 
-export function Sidebar() {
+export function Sidebar({ profile }: { profile: { name: string; emoji: string } }) {
   const path = usePathname();
   return (
     <aside className="sticky top-0 hidden h-dvh w-60 shrink-0 flex-col border-r border-line px-4 py-6 md:flex">
@@ -40,6 +40,18 @@ export function Sidebar() {
           </Link>
         ))}
       </nav>
+      <Link
+        href="/profiles"
+        title="Changer de profil"
+        className="mt-auto flex items-center gap-3 rounded-2xl border border-line bg-surface px-3 py-2.5 transition hover:border-muted"
+      >
+        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-surface-2 text-lg">{profile.emoji}</span>
+        <span className="min-w-0 flex-1">
+          <span className="block truncate text-sm font-semibold">{profile.name || "Mon profil"}</span>
+          <span className="block text-xs text-muted">Changer de profil</span>
+        </span>
+        <ArrowLeftRight size={16} className="shrink-0 text-muted" />
+      </Link>
     </aside>
   );
 }

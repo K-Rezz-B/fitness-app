@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Flame, Trophy, Timer, Target, Sparkles, PlayCircle, CalendarCheck2 } from "lucide-react";
-import { getPlans, getProfile, getVideos, getWorkouts } from "@/lib/data";
+import { getPlans, getVideos, getWorkouts } from "@/lib/data";
+import { requireProfile } from "@/lib/session";
 import { computeStats } from "@/lib/stats";
 import { suggest } from "@/lib/templates";
 import { typeInfo } from "@/lib/constants";
@@ -20,8 +21,9 @@ const QUOTES = [
 ];
 
 export default async function Dashboard({ searchParams }: PageProps<"/">) {
-  const [profile, all, videos, plans, sp] = await Promise.all([getProfile(), getWorkouts(), getVideos(), getPlans(), searchParams]);
-  const target = profile?.weeklySessionsTarget ?? 3;
+  const profile = await requireProfile();
+  const [all, videos, plans, sp] = await Promise.all([getWorkouts(profile.id), getVideos(profile.id), getPlans(profile.id), searchParams]);
+  const target = profile.weeklySessionsTarget;
   const s = computeStats(all, target);
   const t = today();
   const { template, reason } = suggest(all.slice(0, 20), target);
@@ -39,7 +41,7 @@ export default async function Dashboard({ searchParams }: PageProps<"/">) {
   return (
     <>
       <PageHeader
-        title={`Salut${profile?.name ? ` ${profile.name}` : ""} 👋`}
+        title={`Salut${profile.name ? ` ${profile.name}` : ""} 👋`}
         subtitle={new Intl.DateTimeFormat("fr-FR", { weekday: "long", day: "numeric", month: "long", timeZone: "UTC" }).format(new Date(`${t}T00:00:00Z`))}
       />
 

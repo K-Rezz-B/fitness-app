@@ -1,9 +1,10 @@
 import Link from "next/link";
-import { UserRound } from "lucide-react";
 import clsx from "clsx";
 import type { ReactNode } from "react";
+import { getActiveProfile } from "@/lib/session";
 
-export function PageHeader({ title, subtitle, action }: { title: string; subtitle?: string; action?: ReactNode }) {
+export async function PageHeader({ title, subtitle, action }: { title: string; subtitle?: string; action?: ReactNode }) {
+  const me = await getActiveProfile();
   return (
     <header className="mb-6 flex items-end justify-between gap-4">
       <div className="min-w-0">
@@ -12,8 +13,8 @@ export function PageHeader({ title, subtitle, action }: { title: string; subtitl
       </div>
       <div className="flex shrink-0 items-center gap-2">
         {action}
-        <Link href="/profile" aria-label="Profil" className="grid h-10 w-10 place-items-center rounded-full border border-line bg-surface md:hidden">
-          <UserRound size={18} />
+        <Link href="/profile" aria-label={`Profil ${me?.name ?? ""}`} className="grid h-10 w-10 place-items-center rounded-full border border-line bg-surface text-lg md:hidden">
+          {me?.emoji ?? "💪"}
         </Link>
       </div>
     </header>
