@@ -37,6 +37,20 @@ export const profile = pgTable("profile", {
   /** Début d'exercice Apple Watch reçu, en attente du signal de fin */
   pendingWorkoutStart: timestamp("pending_workout_start", { withTimezone: true }),
   pendingWorkoutType: text("pending_workout_type"),
+  // --- Coach planificateur (questionnaire) ---
+  planDays: smallint("plan_days").array().notNull().default([]), // jours dispo, 1 = lundi
+  planTime: text("plan_time").notNull().default("18:30"),
+  planSessionMin: smallint("plan_session_min").notNull().default(45),
+  planEquipment: text("plan_equipment").notNull().default("gym"), // gym | home | bodyweight
+  planLevel: text("plan_level").notNull().default("beginner"), // beginner | intermediate | advanced
+  planSports: text("plan_sports").array().notNull().default([]),
+  planAuto: boolean("plan_auto").notNull().default(true), // re-planifie chaque dimanche
+  planCycleStart: date("plan_cycle_start"), // lundi de la 1re semaine du cycle de 4 semaines
+  planNotes: text("plan_notes").array().notNull().default([]), // explications de la semaine générée
+  planEasy: boolean("plan_easy").notNull().default(false), // semaine allégée (décharge / surcharge / reprise)
+  // --- Objectifs d'activité quotidienne (app Forme) ---
+  moveGoalKcal: smallint("move_goal_kcal").notNull().default(400),
+  stepsGoal: smallint("steps_goal").notNull().default(8000),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
@@ -88,9 +102,27 @@ export const plans = pgTable("plans", {
   durationMin: integer("duration_min").notNull().default(60),
   reminderMin: integer("reminder_min").notNull().default(30),
   active: boolean("active").notNull().default(true),
+  source: text("source").notNull().default("manual"), // manual | coach
+  templateId: text("template_id"), // programme prescrit par le coach
+  rpe: smallint("rpe"), // intensité visée
+  notes: text("notes"), // pourquoi cette séance
+  weekStart: date("week_start"), // semaine pour laquelle le coach l'a générée
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 }, (t) => [index("plans_profile_idx").on(t.profileId)]);
+
+/** Activité quotidienne importée d'Apple Santé (app Forme) : pas, énergie active, distance… */
+export const dailyActivity = pgTable("daily_activity", {
+  id: serial("id").primaryKey(),
+  profileId: profileId(),
+  date: date("date").notNull(),
+  steps: integer("steps"),
+  activeKcal: integer("active_kcal"),
+  distanceKm: real("distance_km"),
+  exerciseMin: integer("exercise_min"),
+  standHours: smallint("stand_hours"),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [uniqueIndex("daily_activity_profile_date_idx").on(t.profileId, t.date)]);
 
 export const videos = pgTable("videos", {
   id: serial("id").primaryKey(),
@@ -136,3 +168,4 @@ export type Plan = typeof plans.$inferSelect;
 export type Video = typeof videos.$inferSelect;
 export type PushSubscriptionRow = typeof pushSubscriptions.$inferSelect;
 export type Passkey = typeof passkeys.$inferSelect;
+export type DailyActivity = typeof dailyActivity.$inferSelect;

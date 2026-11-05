@@ -2,8 +2,8 @@ import "server-only";
 import { cache } from "react";
 import { and, asc, desc, eq, gte } from "drizzle-orm";
 import { db } from "./db";
-import { passkeys, plans, profile, pushSubscriptions, videos, weights, workouts } from "./schema";
-import { dayKey, today, weekStart } from "./dates";
+import { dailyActivity, passkeys, plans, profile, pushSubscriptions, videos, weights, workouts } from "./schema";
+import { addDays, dayKey, today, weekStart } from "./dates";
 
 /** Toutes les lectures sont filtrées par profil : le paramètre `pid` est obligatoire. */
 export const listProfiles = cache(() => db.select().from(profile).orderBy(asc(profile.id)));
@@ -13,6 +13,8 @@ export const getWorkout = async (pid: number, id: number) =>
   (await db.select().from(workouts).where(and(eq(workouts.id, id), eq(workouts.profileId, pid))))[0];
 export const getWeights = (pid: number) =>
   db.select().from(weights).where(eq(weights.profileId, pid)).orderBy(desc(weights.date), desc(weights.id));
+export const getPlan = async (pid: number, id: number) =>
+  (await db.select().from(plans).where(and(eq(plans.id, id), eq(plans.profileId, pid))))[0];
 export const getPlans = (pid: number) =>
   db.select().from(plans).where(eq(plans.profileId, pid)).orderBy(asc(plans.weekday), asc(plans.time));
 export const getVideos = (pid: number) =>
@@ -31,3 +33,11 @@ export async function countThisWeek(pid: number) {
     .where(and(eq(workouts.profileId, pid), gte(workouts.date, new Date(Date.now() - 8 * 86_400_000))));
   return rows.filter((r) => dayKey(r.date) >= ws).length;
 }
+
+/** Activité quotidienne (app Forme) des `days` derniers jours, du plus récent au plus ancien */
+export const getActivity = (pid: number, days = 30) =>
+  db
+    .select()
+    .from(dailyActivity)
+    .where(and(eq(dailyActivity.profileId, pid), gte(dailyActivity.date, addDays(today(), -(days - 1)))))
+    .orderBy(desc(dailyActivity.date));

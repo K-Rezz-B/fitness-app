@@ -51,7 +51,8 @@ const VTIMEZONES: Record<string, string[]> = {
   ],
 };
 
-export function buildCalendar(plans: Plan[], tz: string, appUrl?: string, owner?: string): string {
+/** `details` : lignes ajoutées à la description (ex. exercices prescrits par le coach), par id de créneau. */
+export function buildCalendar(plans: Plan[], tz: string, appUrl?: string, owner?: string, details?: Map<number, string[]>): string {
   const t = today();
   const vtz = VTIMEZONES[tz];
   const dt = (name: string, value: string) => (vtz ? `${name};TZID=${tz}:${value}` : `${name}:${value}`);
@@ -73,6 +74,8 @@ export function buildCalendar(plans: Plan[], tz: string, appUrl?: string, owner?
     const offset = (p.weekday - isoWeekday(startFrom) + 7) % 7;
     const first = addDays(startFrom, offset);
     const info = typeInfo(p.type);
+    const link = appUrl ? (p.source === "coach" && p.templateId ? `${appUrl}/workouts/new?plan=${p.id}` : `${appUrl}/workouts/new?type=${p.type}`) : null;
+    const extra = details?.get(p.id);
     lines.push(
       "BEGIN:VEVENT",
       `UID:plan-${p.id}@fitpulse`,
@@ -83,8 +86,8 @@ export function buildCalendar(plans: Plan[], tz: string, appUrl?: string, owner?
       dt("DTEND", endOf(first, p.time, p.durationMin)),
       `RRULE:FREQ=WEEKLY;BYDAY=${BYDAY[p.weekday]}`,
       `SUMMARY:${esc(`${info.emoji} ${p.title}`)}`,
-      `DESCRIPTION:${esc(`Séance obligatoire · ${info.label} · ${p.durationMin} min${appUrl ? `\nLogger la séance : ${appUrl}/workouts/new?type=${p.type}` : ""}`)}`,
-      ...(appUrl ? [`URL:${appUrl}/workouts/new?type=${p.type}`] : []),
+      `DESCRIPTION:${esc(`${p.source === "coach" ? "Prévue par ton coach" : "Séance obligatoire"} · ${info.label} · ${p.durationMin} min${p.rpe ? ` · RPE ${p.rpe}` : ""}${extra?.length ? `\n\n${extra.join("\n")}` : ""}${link ? `\n\nLogger la séance : ${link}` : ""}`)}`,
+      ...(link ? [`URL:${link}`] : []),
       "CATEGORIES:Sport",
       "STATUS:CONFIRMED",
       "TRANSP:OPAQUE",

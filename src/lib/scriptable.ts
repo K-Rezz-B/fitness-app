@@ -126,6 +126,10 @@ function medium(w, d) {
   text(col, "🔥 " + d.streak.days + " j  ·  " + d.week.minutes + " min  ·  niv. " + d.level, 12, C.ink);
   col.addSpacer(3);
   text(col, nextLine(d), 12, C.violet);
+  if (d.activity && d.activity.steps !== null) {
+    col.addSpacer(2);
+    text(col, "👟 " + d.activity.steps + " pas · 🔥 " + (d.activity.activeKcal || 0) + "/" + d.activity.moveGoalKcal + " kcal", 11, C.muted);
+  }
 }
 
 function lockCircular(w, d) {

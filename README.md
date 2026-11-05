@@ -41,6 +41,7 @@ Un seul mot de passe pour l'app, **plusieurs profils** (toi, ton/ta partenaire�
 - Après connexion, l'écran **« Qui s'entraîne ? »** (`/profiles`) s'affiche s'il y a plusieurs profils ; avec un seul profil, il est choisi d'office.
 - Le profil choisi est mémorisé sur l'appareil (1 an). Changer : barre latérale (Mac) ou page **Profil › Changer de profil** (iPhone).
 - Supprimer un profil (page Profil, tout en bas) supprime toutes ses données, sans toucher aux autres.
+- Les données d'avant le multi-profils sont rattachées au profil n° 1 par la migration.
 
 ## Intégrations Apple (page **Apple**)
 
@@ -51,8 +52,19 @@ Tout se configure depuis la page **Apple** de l'app (barre latérale, ou Profil 
 - **Face ID / Touch ID** : passkeys (trousseau iCloud) → connexion sans mot de passe, directement sur le bon profil.
 - **Widget** écran d'accueil / verrouillé via l'app gratuite **Scriptable** (script généré avec ton jeton) : score, séances de la semaine, série, prochain créneau (`GET /api/v1/summary`).
 
+- **Activité du jour (app Forme)** : une automatisation quotidienne envoie pas, énergie active et distance à `POST /api/v1/activity` → anneaux « Bouger » et pas sur l'accueil, et le coach calcule ta dépense avec ton niveau d'activité **mesuré** (moyenne des pas sur 14 j) au lieu de celui déclaré.
+
 Les API `/api/v1/*` s'authentifient par `Authorization: Bearer <jeton du profil>` (régénérable / désactivable).
-- Les données d'avant le multi-profils sont rattachées au profil n° 1 par la migration.
+
+## Coach planificateur (page **Planning**)
+
+Un questionnaire unique (jours dispo, heure, durée, matériel, niveau, sports aimés) et le coach génère ta semaine :
+
+- **Composition** selon l'objectif : ≥ 2 renforcements (OMS), cardio en zone 2, 1 séance intense si le niveau le permet, sortie longue le week-end pour la performance, mobilité si beaucoup de séances.
+- **Placement** : 48 h minimum entre deux séances sur les mêmes muscles (haut / bas du corps alternés), pas d'intensité la veille des jambes ; tes créneaux perso sont gardés et comptés.
+- **Exercices et charges** : séries × reps et charge conseillée d'après ta meilleure charge des 6 dernières semaines ; « Faire cette séance » pré-remplit le formulaire. Les événements Calendrier listent les exercices.
+- **Cycle de 4 semaines** : mise en route → progression → pic → décharge (volume −1 série, charges −15 %).
+- **Adaptation automatique chaque dimanche soir** (cron) : semaine allégée si moins de la moitié des séances ont été faites ou si le ratio de charge aiguë/chronique dépasse 1,3 (avec ≥ 3 semaines d'historique) ; notification « programme prêt ».
 
 ## Rappels de séances (Calendrier Apple)
 
@@ -64,8 +76,8 @@ Page **Planning** › *S'abonner* (lien `webcal://`, **propre à chaque profil**
 
 ## Fonctionnalités
 
-- **Séances** : 12 types (force / cardio / mobilité), durée, RPE, distance, exercices séries × reps × kg, notes, vidéo liée.
-- **Variation** : 18 programmes prêts, bouton « Surprends-moi », séance suggérée selon ta semaine (≥ 2 séances de force OMS, récup après grosse charge, alternance des stimuli).
+- **Séances** : 13 types (force / cardio / mobilité), durée, RPE, distance, exercices séries × reps × kg, notes, vidéo liée.
+- **Variation** : 29 programmes prêts (salle, maison avec haltères, sans matériel, cardio, mobilité), bouton « Surprends-moi », séance suggérée selon ta semaine (≥ 2 séances de force OMS, récup après grosse charge, alternance des stimuli).
 - **Score de forme /100** : régularité 40 · volume OMS 25 · série 20 · variété 15.
 - **Motivation** : XP & niveaux, séries jours/semaines, 10 badges, heatmap 18 semaines, minutes/semaine par catégorie, citation du jour.
 - **Coach** : IMC, métabolisme (Mifflin-St Jeor), dépense totale, calories & macros selon objectif, hydratation, tendance de poids (moyenne 7 j), alerte charge (ACWR), conseils sourcés.
@@ -80,6 +92,8 @@ Page **Planning** › *S'abonner* (lien `webcal://`, **propre à chaque profil**
 - Gabbett, *Br J Sports Med* 2016 — ratio charge aiguë/chronique
 - Foster et al., *J Strength Cond Res* 2001 — charge sRPE
 - Ainsworth et al., Compendium of Physical Activities 2011 — MET
+- Tudor-Locke & Bassett, *Sports Med* 2004 — niveaux d'activité selon les pas/jour
+- Paluch et al., *Lancet Public Health* 2022 — pas/jour et mortalité
 
 ## Dev local
 

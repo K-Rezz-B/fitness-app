@@ -10,6 +10,7 @@ import { deletePlan, savePlan, togglePlan } from "@/app/actions";
 import { CopyButton } from "@/components/copy-button";
 import { Empty, PageHeader } from "@/components/ui";
 import type { Plan } from "@/lib/schema";
+import { CoachSection } from "./coach-section";
 
 export const metadata: Metadata = { title: "Planning" };
 
@@ -107,6 +108,8 @@ export default async function Planning() {
         <p className="mt-2 text-xs text-muted">✅ fait · ⭐ séance bonus · grisé = manquée</p>
       </section>
 
+      <CoachSection me={me} coachPlans={plans.filter((p) => p.source === "coach")} workouts={workouts} />
+
       {/* Calendrier Apple */}
       <section className="glow mb-4 rounded-3xl border border-line p-5">
         <div className="mb-2 flex items-center gap-2 font-semibold">
@@ -146,7 +149,10 @@ export default async function Planning() {
               <summary className="flex cursor-pointer list-none items-center gap-3 p-4">
                 <div className="grid h-11 w-11 place-items-center rounded-2xl bg-surface-2 text-xl" style={{ boxShadow: `inset 0 -3px 0 ${CATEGORIES[info.category].color}` }}>{info.emoji}</div>
                 <div className="min-w-0 flex-1">
-                  <div className="truncate font-semibold">{p.title}</div>
+                  <div className="flex items-center gap-2">
+                    <span className="truncate font-semibold">{p.title}</span>
+                    {p.source === "coach" && <span className="chip shrink-0 py-0.5 text-[10px]">🧠 Coach</span>}
+                  </div>
                   <div className="text-xs text-muted">{WEEKDAYS[p.weekday - 1]} · {p.time} · {p.durationMin} min · 🔔 {p.reminderMin ? `${p.reminderMin >= 60 ? `${p.reminderMin / 60} h` : `${p.reminderMin} min`} avant` : "à l'heure"}</div>
                 </div>
                 <Pencil size={16} className="text-muted" />

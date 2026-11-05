@@ -1,13 +1,13 @@
 import Link from "next/link";
 import { Flame, Trophy, Timer, Target, Sparkles, PlayCircle, CalendarCheck2 } from "lucide-react";
-import { getPlans, getVideos, getWorkouts } from "@/lib/data";
+import { getActivity, getPlans, getVideos, getWorkouts } from "@/lib/data";
 import { requireProfile } from "@/lib/session";
 import { computeStats } from "@/lib/stats";
-import { suggest } from "@/lib/templates";
+import { suggest, templateById } from "@/lib/templates";
 import { typeInfo } from "@/lib/constants";
-import { dayKey, fmtDate, isoWeekday, today } from "@/lib/dates";
+import { addDays, dayKey, fmtDate, isoWeekday, today } from "@/lib/dates";
 import { PageHeader, Progress, Stat } from "@/components/ui";
-import { Heatmap, ScoreRing, SplitBar } from "@/components/viz";
+import { ActivityRings, Heatmap, ScoreRing, SplitBar, StepsBars } from "@/components/viz";
 import { WeeklyChart } from "@/components/charts";
 
 const QUOTES = [
@@ -22,14 +22,24 @@ const QUOTES = [
 
 export default async function Dashboard({ searchParams }: PageProps<"/">) {
   const profile = await requireProfile();
-  const [all, videos, plans, sp] = await Promise.all([getWorkouts(profile.id), getVideos(profile.id), getPlans(profile.id), searchParams]);
+  const [all, videos, plans, activity, sp] = await Promise.all([getWorkouts(profile.id), getVideos(profile.id), getPlans(profile.id), getActivity(profile.id, 7), searchParams]);
   const target = profile.weeklySessionsTarget;
   const s = computeStats(all, target);
   const t = today();
-  const { template, reason } = suggest(all.slice(0, 20), target);
+  const suggested = suggest(all.slice(0, 20), target);
+  const planHref = (p: (typeof plans)[number]) =>
+    p.source === "coach" && p.templateId ? `/workouts/new?plan=${p.id}` : `/workouts/new?type=${p.type}&title=${encodeURIComponent(p.title)}&duration=${p.durationMin}`;
   const video = videos.find((v) => v.type === template.type) ?? videos.find((v) => v.tags.some((tag) => typeInfo(template.type).label.toLowerCase().includes(tag)));
   const todayPlans = plans.filter((p) => p.active && p.weekday === isoWeekday(t));
   const doneToday = all.filter((w) => dayKey(w.date) === t);
+  // Séance du coach prévue aujourd'hui et pas encore faite → c'est elle la suggestion
+  const coachToday = todayPlans.find(
+    (p) => p.source === "coach" && p.templateId && !doneToday.some((w) => typeInfo(w.type).category === typeInfo(p.type).category),
+  );
+  const coachTpl = coachToday ? templateById(coachToday.templateId!) : undefined;
+  const template = coachTpl ?? suggested.template;
+  const reason = coachTpl ? `Prévue aujourd'hui par ton coach (${coachToday!.time}) · ${coachToday!.notes ?? ""}` : suggested.reason;
+  const startHref = coachToday && coachTpl ? `/workouts/new?plan=${coachToday.id}` : `/workouts/new?template=${template.id}`;
   const quote = QUOTES[Number(t.replaceAll("-", "")) % QUOTES.length];
 
   const weekData = s.weeks.map((w) => ({
@@ -91,15 +101,39 @@ export default async function Dashboard({ searchParams }: PageProps<"/">) {
         <Stat label="Total" value={s.totalSessions} unit="séances" sub={`${Math.round(s.totalMin / 60)} h · ${s.totalKm.toFixed(0)} km`} />
       </section>
 
+      {/* Activité du jour (app Forme, via Raccourcis) */}
+      {activity.length > 0 && (() => {
+        const act = activity.find((a) => a.date === t);
+        const nf = new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 1 });
+        const week = Array.from({ length: 7 }, (_, i) => addDays(t, i - 6)).map((date) => ({ date, steps: activity.find((a) => a.date === date)?.steps ?? null }));
+        return (
+          <section className="card mb-4">
+            <div className="mb-3 flex items-baseline justify-between text-sm font-semibold">
+              <span>🔥 Activité du jour <span className="font-normal text-muted">· app Forme</span></span>
+              {!act && <span className="text-xs font-normal text-muted">pas encore de données aujourd&apos;hui</span>}
+            </div>
+            <div className="flex flex-col items-center gap-5 sm:flex-row">
+              <ActivityRings kcal={act?.activeKcal ?? 0} kcalGoal={profile.moveGoalKcal} steps={act?.steps ?? 0} stepsGoal={profile.stepsGoal} />
+              <div className="grid w-full flex-1 grid-cols-3 gap-2 text-center sm:max-w-xs sm:text-left">
+                <div><div className="font-mono text-xl font-semibold text-cardio tabular-nums">{nf.format(act?.activeKcal ?? 0)}</div><div className="text-[11px] text-muted">/ {profile.moveGoalKcal} kcal</div></div>
+                <div><div className="font-mono text-xl font-semibold text-accent tabular-nums">{nf.format(act?.steps ?? 0)}</div><div className="text-[11px] text-muted">/ {nf.format(profile.stepsGoal)} pas</div></div>
+                <div><div className="font-mono text-xl font-semibold tabular-nums">{nf.format(act?.distanceKm ?? 0)}</div><div className="text-[11px] text-muted">km</div></div>
+              </div>
+              <div className="w-full sm:flex-1"><StepsBars days={week} goal={profile.stepsGoal} /></div>
+            </div>
+          </section>
+        );
+      })()}
+
       <div className="mb-4 grid gap-4 lg:grid-cols-5">
         {/* Suggestion */}
         <section className="card lg:col-span-2">
           <div className="mb-3 flex items-center gap-2 text-sm font-semibold">
-            <Sparkles size={16} className="text-accent" /> Séance suggérée
+            <Sparkles size={16} className="text-accent" /> {coachTpl ? "Séance du jour · coach" : "Séance suggérée"}
           </div>
           <div className="text-3xl">{typeInfo(template.type).emoji}</div>
           <h3 className="mt-2 text-lg font-bold">{template.title}</h3>
-          <p className="text-sm text-ink-2">{template.focus} · {template.durationMin} min · RPE {template.rpe}</p>
+          <p className="text-sm text-ink-2">{template.focus} · {coachToday?.durationMin ?? template.durationMin} min · RPE {coachToday?.rpe ?? template.rpe}</p>
           <p className="mt-3 rounded-xl bg-surface-2 p-3 text-xs text-ink-2">💡 {reason}</p>
           <ul className="mt-3 space-y-1 text-sm">
             {template.exercises.slice(0, 5).map((e) => (
@@ -110,7 +144,7 @@ export default async function Dashboard({ searchParams }: PageProps<"/">) {
             ))}
           </ul>
           <div className="mt-4 flex flex-wrap gap-2">
-            <Link href={`/workouts/new?template=${template.id}`} className="btn-primary">C&apos;est parti</Link>
+            <Link href={startHref} className="btn-primary">C&apos;est parti</Link>
             {video && (
               <a href={video.url} target="_blank" rel="noreferrer" className="btn-ghost">
                 <PlayCircle size={16} /> Vidéo
@@ -140,7 +174,7 @@ export default async function Dashboard({ searchParams }: PageProps<"/">) {
                   <span className="text-sm">
                     {done ? "✅" : "⏳"} <b>{p.time}</b> · {typeInfo(p.type).emoji} {p.title}
                   </span>
-                  {!done && <Link href={`/workouts/new?type=${p.type}&title=${encodeURIComponent(p.title)}&duration=${p.durationMin}`} className="btn-primary px-3 py-1.5 text-xs">Valider</Link>}
+                  {!done && <Link href={planHref(p)} className="btn-primary px-3 py-1.5 text-xs">Valider</Link>}
                 </li>
               );
             })}

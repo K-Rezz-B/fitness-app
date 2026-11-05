@@ -195,3 +195,50 @@ export function normalizeWeight(b: Body, now: Date): Result<ImportedWeight> {
     },
   };
 }
+
+// ---------- Activité quotidienne (app Forme : pas, énergie active, distance…) ----------
+/** Accepte un nombre, une chaîne avec unité, ou une liste d'échantillons Santé (additionnés). */
+const sumOf = (v: unknown, parse: (x: unknown) => number | null): number | null => {
+  if (!Array.isArray(v)) return parse(v);
+  const nums = v.map(parse).filter((n): n is number => n !== null);
+  return nums.length ? nums.reduce((a, b) => a + b, 0) : null;
+};
+
+export type ImportedActivity = {
+  date: string;
+  steps: number | null;
+  activeKcal: number | null;
+  distanceKm: number | null;
+  exerciseMin: number | null;
+  standHours: number | null;
+};
+
+export function normalizeActivity(b: Body, now: Date): Result<ImportedActivity> {
+  const d = parseDate(pick(b, "date", "day", "jour"));
+  const v = {
+    steps: sumOf(pick(b, "steps", "pas"), parseNumber),
+    activeKcal: sumOf(pick(b, "activeKcal", "activeEnergy", "energieActive", "calories"), parseCalories),
+    distanceKm: sumOf(pick(b, "distanceKm", "distance"), parseDistanceKm),
+    exerciseMin: sumOf(pick(b, "exerciseMin", "exerciseMinutes", "exercise"), parseDurationText),
+    standHours: sumOf(pick(b, "standHours", "stand"), parseNumber),
+  };
+  if (Object.values(v).every((x) => x === null)) return { ok: false, error: "aucune donnée (steps, activeKcal, distanceKm, exerciseMin, standHours)" };
+  const bad =
+    (v.steps !== null && (v.steps < 0 || v.steps > 150_000)) ||
+    (v.activeKcal !== null && v.activeKcal > 15_000) ||
+    (v.distanceKm !== null && v.distanceKm > 400) ||
+    (v.exerciseMin !== null && (v.exerciseMin < 0 || v.exerciseMin > 1440)) ||
+    (v.standHours !== null && (v.standHours < 0 || v.standHours > 24));
+  if (bad) return { ok: false, error: "valeurs hors limites" };
+  return {
+    ok: true,
+    value: {
+      date: dayKey(d ?? now),
+      steps: v.steps !== null ? Math.round(v.steps) : null,
+      activeKcal: v.activeKcal !== null ? Math.round(v.activeKcal) : null,
+      distanceKm: v.distanceKm !== null ? Math.round(v.distanceKm * 100) / 100 : null,
+      exerciseMin: v.exerciseMin !== null ? Math.round(v.exerciseMin) : null,
+      standHours: v.standHours !== null ? Math.round(v.standHours) : null,
+    },
+  };
+}

@@ -1,4 +1,5 @@
-import { getPlans, listProfiles } from "@/lib/data";
+import { getPlans, getWorkouts, listProfiles } from "@/lib/data";
+import { calendarDetails } from "@/lib/coach-plan";
 import { buildCalendar } from "@/lib/ics";
 import { profileIdFromCalendarToken } from "@/lib/auth";
 import { TZ } from "@/lib/constants";
@@ -12,7 +13,8 @@ export async function GET(req: Request, ctx: RouteContext<"/api/calendar/[token]
   const owner = pid ? (await listProfiles()).find((p) => p.id === pid) : undefined;
   if (!owner) return new Response("Not found", { status: 404 });
   const origin = new URL(req.url).origin;
-  return new Response(buildCalendar(await getPlans(owner.id), TZ, origin, owner.name), {
+  const [plans, workouts] = await Promise.all([getPlans(owner.id), getWorkouts(owner.id)]);
+  return new Response(buildCalendar(plans, TZ, origin, owner.name, calendarDetails(owner, plans, workouts)), {
     headers: {
       "Content-Type": "text/calendar; charset=utf-8",
       "Content-Disposition": 'inline; filename="fitpulse.ics"',
