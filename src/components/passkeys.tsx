@@ -2,7 +2,14 @@
 import { useState, useSyncExternalStore, useTransition } from "react";
 import { ScanFace } from "lucide-react";
 import { browserSupportsWebAuthn, startAuthentication, startRegistration } from "@simplewebauthn/browser";
-import { passkeyLoginOptions, passkeyRegistrationOptions, verifyPasskeyLogin, verifyPasskeyRegistration } from "@/app/apple-actions";
+import {
+  passkeyLoginOptions,
+  passkeyRegistrationOptions,
+  passkeyUnlockOptions,
+  verifyPasskeyLogin,
+  verifyPasskeyRegistration,
+  verifyPasskeyUnlock,
+} from "@/app/apple-actions";
 
 const noop = () => () => {};
 const useWebAuthn = () => useSyncExternalStore(noop, browserSupportsWebAuthn, () => false);
@@ -14,8 +21,8 @@ const explain = (e: unknown) => {
   return (e as Error)?.message ?? "Erreur inattendue";
 };
 
-/** Page /login : connexion par Face ID / Touch ID (ouvre directement le profil de la passkey). */
-export function PasskeyLoginButton() {
+/** Bouton Face ID / Touch ID : demande les options, lance la vérification biométrique, envoie la réponse. */
+function FaceIdButton({ authenticate, label = "Face ID / Touch ID" }: { authenticate: () => Promise<string | null>; label?: string }) {
   const supported = useWebAuthn();
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
@@ -30,8 +37,7 @@ export function PasskeyLoginButton() {
           start(async () => {
             setError(null);
             try {
-              const optionsJSON = await passkeyLoginOptions();
-              const err = await verifyPasskeyLogin(await startAuthentication({ optionsJSON }));
+              const err = await authenticate();
               if (err) setError(err);
             } catch (e) {
               setError(explain(e));
@@ -39,10 +45,31 @@ export function PasskeyLoginButton() {
           })
         }
       >
-        <ScanFace size={18} /> {pending ? "Vérification…" : "Face ID / Touch ID"}
+        <ScanFace size={18} /> {pending ? "Vérification…" : label}
       </button>
       {error && <p className="text-center text-sm text-critical">{error}</p>}
     </div>
+  );
+}
+
+/** Page /login : connexion par Face ID / Touch ID (ouvre directement le profil de la passkey). */
+export function PasskeyLoginButton() {
+  return (
+    <FaceIdButton
+      authenticate={async () => verifyPasskeyLogin(await startAuthentication({ optionsJSON: await passkeyLoginOptions() }))}
+    />
+  );
+}
+
+/** Sélecteur de profils : déverrouille ce profil avec une de ses passkeys (alternative au code PIN). */
+export function PasskeyUnlockButton({ profileId }: { profileId: number }) {
+  return (
+    <FaceIdButton
+      label="Déverrouiller avec Face ID"
+      authenticate={async () =>
+        verifyPasskeyUnlock(profileId, await startAuthentication({ optionsJSON: await passkeyUnlockOptions(profileId) }))
+      }
+    />
   );
 }
 
@@ -64,7 +91,7 @@ export function PasskeyRegisterButton() {
             try {
               const optionsJSON = await passkeyRegistrationOptions();
               const err = await verifyPasskeyRegistration(await startRegistration({ optionsJSON }));
-              setMsg(err ? { ok: false, text: err } : { ok: true, text: "Passkey enregistrée : tu peux te connecter par Face ID / Touch ID." });
+              setMsg(err ? { ok: false, text: err } : { ok: true, text: "Passkey enregistrée : tu peux ouvrir ton profil par Face ID / Touch ID." });
             } catch (e) {
               setMsg({ ok: false, text: explain(e) });
             }

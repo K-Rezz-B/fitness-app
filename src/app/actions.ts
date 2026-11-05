@@ -3,12 +3,14 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq, isNull, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { plans, profile, videos, weights, workouts, type Exercise } from "@/lib/schema";
 import { SESSION_COOKIE, checkPassword, sessionToken } from "@/lib/auth";
 import { after } from "next/server";
-import { COOKIE_OPTS, PROFILE_COOKIE, requireAuth, requireProfile } from "@/lib/session";
+import { COOKIE_OPTS, PROFILE_COOKIE, requireAuth, requireProfile, setUnlockedProfile } from "@/lib/session";
+import { checkProfilePin, hashPin, newPinError } from "@/lib/pin";
+import type { FormState } from "@/components/action-form";
 import { notifyNewBadges } from "@/lib/push";
 import { detectPlatform, youtubeId } from "@/lib/video";
 import { CHANNELS, VIDEO_CATALOG, catalogUrl } from "@/lib/video-catalog";
@@ -55,29 +57,82 @@ export async function logout() {
 // ---------- profils ----------
 const emojiOf = (f: FormData) => (PROFILE_EMOJIS.includes(str(f, "emoji")) ? str(f, "emoji") : PROFILE_EMOJIS[0]);
 
-export async function selectProfile(f: FormData) {
-  await requireAuth();
-  const id = idOf(f);
-  const [p] = id ? await db.select({ id: profile.id }).from(profile).where(eq(profile.id, id)) : [];
-  if (!p) redirect("/profiles");
-  (await cookies()).set(PROFILE_COOKIE, String(p.id), COOKIE_OPTS);
-  revalidateAll();
-  redirect("/");
-}
+const fail = (message: string): FormState => ({ ok: false, message });
+const newPinErrorOf = (f: FormData) => newPinError(str(f, "pin"), str(f, "pinConfirm"));
 
-export async function createProfile(f: FormData) {
+/** Création : le code PIN est obligatoire, le profil est ouvert d'office sur cet appareil. */
+export async function createProfile(_prev: FormState, f: FormData): Promise<FormState> {
   await requireAuth();
   const name = str(f, "name").slice(0, 60);
-  if (!name) throw new Error("Prénom requis");
-  const [p] = await db.insert(profile).values({ name, emoji: emojiOf(f) }).returning({ id: profile.id });
-  (await cookies()).set(PROFILE_COOKIE, String(p.id), COOKIE_OPTS);
+  if (!name) return fail("Prénom requis.");
+  const err = newPinErrorOf(f);
+  if (err) return fail(err);
+  const pinHash = await hashPin(str(f, "pin"));
+  const [p] = await db.insert(profile).values({ name, emoji: emojiOf(f), pinHash }).returning({ id: profile.id, pinHash: profile.pinHash });
+  await setUnlockedProfile(p);
   revalidateAll();
   redirect("/profile?welcome=1");
 }
 
-export async function deleteProfile(f: FormData) {
+/** Ouvre un profil verrouillé avec son code (essais limités, voir checkProfilePin). */
+export async function unlockWithPin(_prev: FormState, f: FormData): Promise<FormState> {
+  await requireAuth();
+  const id = idOf(f);
+  if (!id) return fail("Profil introuvable.");
+  const r = await checkProfilePin(id, str(f, "pin"));
+  if (!r.ok) return fail(r.error);
+  await setUnlockedProfile({ id, pinHash: r.pinHash });
+  revalidateAll();
+  redirect("/");
+}
+
+/** Profil créé avant le verrou : la première ouverture impose de choisir son code. */
+export async function definePin(_prev: FormState, f: FormData): Promise<FormState> {
+  await requireAuth();
+  const id = idOf(f);
+  const err = newPinErrorOf(f);
+  if (err) return fail(err);
+  const pinHash = await hashPin(str(f, "pin"));
+  // `pin_hash IS NULL` dans le WHERE : impossible d'écraser le code d'un profil déjà protégé
+  const [p] = id
+    ? await db
+        .update(profile)
+        .set({ pinHash, pinFailedAttempts: 0, pinLockedUntil: null })
+        .where(and(eq(profile.id, id), isNull(profile.pinHash)))
+        .returning({ id: profile.id, pinHash: profile.pinHash })
+    : [];
+  if (!p) return fail("Ce profil a déjà un code : déverrouille-le.");
+  await setUnlockedProfile(p);
+  revalidateAll();
+  redirect("/profile?pin=1");
+}
+
+/** Change le code (l'ancien est exigé) ; les autres appareils sont reverrouillés. */
+export async function changePin(_prev: FormState, f: FormData): Promise<FormState> {
   const me = await requireProfile();
-  if (f.get("confirm") !== "on") throw new Error("Confirmation requise");
+  const err = newPinErrorOf(f);
+  if (err) return fail(err);
+  const r = await checkProfilePin(me.id, str(f, "currentPin"));
+  if (!r.ok) return fail(r.error);
+  const pinHash = await hashPin(str(f, "pin"));
+  await db.update(profile).set({ pinHash }).where(eq(profile.id, me.id));
+  await setUnlockedProfile({ id: me.id, pinHash });
+  revalidateAll();
+  return { ok: true, message: "Code modifié. Tes autres appareils devront le saisir à nouveau." };
+}
+
+/** Referme le profil sur cet appareil (retour au sélecteur). */
+export async function lockProfile() {
+  (await cookies()).delete(PROFILE_COOKIE);
+  revalidateAll();
+  redirect("/profiles");
+}
+
+export async function deleteProfile(_prev: FormState, f: FormData): Promise<FormState> {
+  const me = await requireProfile();
+  if (f.get("confirm") !== "on") return fail("Coche la case de confirmation.");
+  const r = await checkProfilePin(me.id, str(f, "pin"));
+  if (!r.ok) return fail(r.error);
   await db.delete(profile).where(eq(profile.id, me.id)); // cascade : séances, pesées, planning, vidéos
   (await cookies()).delete(PROFILE_COOKIE);
   revalidateAll();
