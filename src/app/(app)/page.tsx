@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Flame, Trophy, Timer, Target, Sparkles, PlayCircle, CalendarCheck2 } from "lucide-react";
+import { Flame, Trophy, Timer, Target, Sparkles, CalendarCheck2 } from "lucide-react";
 import { getActivity, getPlans, getVideos, getWorkouts } from "@/lib/data";
 import { requireProfile } from "@/lib/session";
 import { computeStats } from "@/lib/stats";
@@ -7,6 +7,8 @@ import { suggest, templateById } from "@/lib/templates";
 import { WEEKDAYS, typeInfo } from "@/lib/constants";
 import { addDays, dayKey, fmtDate, fmtTime, isoWeekday, today } from "@/lib/dates";
 import { templatesForProfile, upcomingPlan } from "@/lib/coach-plan";
+import { coachVideosFor } from "@/lib/video-coach";
+import { CoachVideo } from "@/components/coach-video";
 import { PageHeader, Progress, Stat } from "@/components/ui";
 import { ActivityRings, Heatmap, ScoreRing, SplitBar, StepsBars } from "@/components/viz";
 import { WeeklyChart } from "@/components/charts";
@@ -54,7 +56,16 @@ export default async function Dashboard({ searchParams }: PageProps<"/">) {
       ? `${doneToday.length ? "Bien joué ! " : "Ton coach n'a rien prévu aujourd'hui : la récupération fait partie du programme. "}${nextLabel ? `Prochaine séance : ${nextLabel}. ` : ""}Une mobilité douce reste possible si tu en as envie.`
       : suggested.reason;
   const startHref = coachToday && coachTpl ? `/workouts/new?plan=${coachToday.id}` : `/workouts/new?template=${template.id}`;
-  const video = videos.find((v) => v.type === template.type) ?? videos.find((v) => v.tags.some((tag) => typeInfo(template.type).label.toLowerCase().includes(tag)));
+  // Vidéo du coach : piochée parmi les vidéos du thème de la séance (tags)
+  const coachVideo = coachVideosFor({
+    library: videos,
+    session: coachToday && coachTpl
+      ? { templateId: coachToday.templateId, type: coachToday.type, durationMin: coachToday.durationMin }
+      : { templateId: template.id, type: template.type, durationMin: template.durationMin },
+    profile,
+    workouts: all,
+    day: t,
+  });
   const quote = QUOTES[Number(t.replaceAll("-", "")) % QUOTES.length];
 
   const weekData = s.weeks.map((w) => ({
@@ -167,11 +178,9 @@ export default async function Dashboard({ searchParams }: PageProps<"/">) {
             ) : (
               <Link href={startHref} className="btn-primary">C&apos;est parti</Link>
             )}
-            {video && (
-              <a href={video.url} target="_blank" rel="noreferrer" className="btn-ghost">
-                <PlayCircle size={16} /> Vidéo
-              </a>
-            )}
+          </div>
+          <div className="mt-4">
+            <CoachVideo result={coachVideo} />
           </div>
           {!coachTpl && !restDay && !equipmentKnown && (
             <p className="mt-3 text-xs text-muted">

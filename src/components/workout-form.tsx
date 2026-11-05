@@ -4,6 +4,8 @@ import { Plus, Trash2, X } from "lucide-react";
 import { WORKOUT_TYPES, typeInfo, CATEGORIES } from "@/lib/constants";
 import type { Exercise, Workout } from "@/lib/schema";
 import { saveWorkout } from "@/app/actions";
+import type { CoachVideoResult, VideoPick } from "@/lib/video-coach";
+import { CoachVideo } from "./coach-video";
 
 type Initial = Partial<Pick<Workout, "id" | "type" | "title" | "durationMin" | "rpe" | "distanceKm" | "calories" | "notes" | "videoId" | "exercises">> & { date?: string };
 
@@ -14,8 +16,12 @@ function toLocalInput(d: Date) {
   return new Date(d.getTime() - off * 60_000).toISOString().slice(0, 16);
 }
 
-export function WorkoutForm({ initial, videos, weightKg }: { initial: Initial; videos: { id: number; title: string }[]; weightKg?: number }) {
+/** Vidéo du coach pré-sélectionnée comme « vidéo suivie » si c'est une vidéo guidée de la vidéothèque. */
+const followed = (p?: VideoPick) => (p?.id && !p.cooldown ? String(p.id) : "");
+
+export function WorkoutForm({ initial, videos, weightKg, coach }: { initial: Initial; videos: { id: number; title: string }[]; weightKg?: number; coach?: CoachVideoResult }) {
   const kg = weightKg ?? 75;
+  const [videoId, setVideoId] = useState(() => (initial.videoId ? String(initial.videoId) : followed(coach?.picks[0])));
   const [type, setType] = useState(initial.type ?? "muscu");
   const [rpe, setRpe] = useState(initial.rpe ?? 6);
   const [duration, setDuration] = useState(initial.durationMin ?? 45);
@@ -32,6 +38,8 @@ export function WorkoutForm({ initial, videos, weightKg }: { initial: Initial; v
       <input type="hidden" name="type" value={type} />
       <input type="hidden" name="date" value={iso} />
       <input type="hidden" name="exercises" value={JSON.stringify(exercises)} />
+
+      {coach && <CoachVideo result={coach} onPick={(p) => setVideoId(followed(p))} />}
 
       <section className="card">
         <div className="label">Type de séance</div>
@@ -91,7 +99,7 @@ export function WorkoutForm({ initial, videos, weightKg }: { initial: Initial; v
         {videos.length > 0 && (
           <div>
             <label className="label" htmlFor="videoId">Vidéo suivie</label>
-            <select id="videoId" name="videoId" defaultValue={initial.videoId ?? ""} className="input">
+            <select id="videoId" name="videoId" value={videoId} onChange={(e) => setVideoId(e.target.value)} className="input">
               <option value="">—</option>
               {videos.map((v) => <option key={v.id} value={v.id}>{v.title}</option>)}
             </select>

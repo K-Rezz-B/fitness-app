@@ -1,13 +1,14 @@
 "use client";
 import { useMemo, useState } from "react";
-import { ExternalLink, Heart, Pencil, Plus, Search, Trash2, X } from "lucide-react";
+import { ExternalLink, Heart, Pencil, Plus, Search, Sparkles, Trash2, X } from "lucide-react";
 import clsx from "clsx";
 import type { Video } from "@/lib/schema";
 import { WORKOUT_TYPES, typeInfo } from "@/lib/constants";
 import { PLATFORM, youtubeId } from "@/lib/video";
-import { deleteVideo, saveVideo, toggleFavorite } from "@/app/actions";
+import { deleteVideo, importVideoSelection, saveVideo, toggleFavorite } from "@/app/actions";
+import { CHANNELS, THEME_TAGS } from "@/lib/video-catalog";
 
-const SUGGESTED_TAGS = ["abdos", "full body", "haut du corps", "jambes", "fessiers", "dos", "cardio", "hiit", "mobilité", "étirements", "sans matériel", "haltères", "débutant", "échauffement", "récup"];
+const SUGGESTED_TAGS = THEME_TAGS;
 
 function VideoForm({ v, onDone }: { v?: Video; onDone: () => void }) {
   const [tags, setTags] = useState(v?.tags.join(", ") ?? "");
@@ -77,9 +78,38 @@ function Sheet({ title, onClose, children }: { title: string; onClose: () => voi
   );
 }
 
-export function VideoLibrary({ videos }: { videos: Video[] }) {
+/** Sélection du coach : grande carte tant qu'elle n'est pas importée, simple bouton s'il manque des nouveautés. */
+function SelectionBanner({ missing, total }: { missing: number; total: number }) {
+  if (!missing) return null;
+  const channels = Object.values(CHANNELS).map((c) => c.name).join(", ");
+  if (missing < total)
+    return (
+      <form action={importVideoSelection} className="mb-3">
+        <button className="chip text-accent"><Sparkles size={12} /> Ajouter {missing} vidéo(s) de la sélection du coach</button>
+      </form>
+    );
+  return (
+    <section className="card mb-4 border-accent/40 bg-accent/5">
+      <div className="flex items-start gap-3">
+        <div className="text-3xl">🎬</div>
+        <div className="min-w-0 flex-1">
+          <h2 className="font-semibold">Sélection du coach · {total} séances guidées</h2>
+          <p className="mt-1 text-sm text-ink-2">
+            Des cours complets en studio ({channels}), rangés par thème : full body, haut du corps, jambes, HIIT, boxe, yoga, mobilité…
+            Ton coach y pioche la vidéo qui colle au thème de ta séance.
+          </p>
+          <form action={importVideoSelection} className="mt-3">
+            <button className="btn-primary"><Plus size={16} /> Ajouter à ma vidéothèque</button>
+          </form>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+export function VideoLibrary({ videos, initialTag, selection }: { videos: Video[]; initialTag: string | null; selection: { missing: number; total: number } }) {
   const [q, setQ] = useState("");
-  const [tag, setTag] = useState<string | null>(null);
+  const [tag, setTag] = useState<string | null>(initialTag);
   const [favOnly, setFavOnly] = useState(false);
   const [editing, setEditing] = useState<Video | "new" | null>(null);
   const [playing, setPlaying] = useState<Video | null>(null);
@@ -87,8 +117,9 @@ export function VideoLibrary({ videos }: { videos: Video[] }) {
   const tagCounts = useMemo(() => {
     const m = new Map<string, number>();
     for (const v of videos) for (const t of v.tags) m.set(t, (m.get(t) ?? 0) + 1);
+    if (initialTag && !m.has(initialTag)) m.set(initialTag, 0); // filtre venu du coach (?tag=) : toujours visible
     return [...m].sort((a, b) => b[1] - a[1]);
-  }, [videos]);
+  }, [videos, initialTag]);
 
   const list = videos.filter(
     (v) =>
@@ -99,6 +130,7 @@ export function VideoLibrary({ videos }: { videos: Video[] }) {
 
   return (
     <>
+      <SelectionBanner {...selection} />
       <div className="mb-3 flex gap-2">
         <div className="relative flex-1">
           <Search size={16} className="absolute top-1/2 left-3 -translate-y-1/2 text-muted" />
@@ -145,7 +177,10 @@ export function VideoLibrary({ videos }: { videos: Video[] }) {
                 </button>
                 <div className="p-4">
                   <div className="flex items-start gap-2">
-                    <h3 className="line-clamp-2 flex-1 text-sm font-semibold">{v.title}</h3>
+                    <div className="min-w-0 flex-1">
+                      <h3 className="line-clamp-2 text-sm font-semibold">{v.title}</h3>
+                      {v.notes && <p className="mt-0.5 line-clamp-1 text-xs text-muted">{v.notes}</p>}
+                    </div>
                     <form action={toggleFavorite}>
                       <input type="hidden" name="id" value={v.id} />
                       <button aria-label="Favori"><Heart size={18} className={v.favorite ? "fill-critical text-critical" : "text-muted"} /></button>

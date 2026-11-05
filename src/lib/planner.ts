@@ -210,6 +210,9 @@ const NEEDS: Record<string, Needs> = {
 };
 const HARD = new Set(["fractionne", "tabata", "emom", "wod", "velo-sst"]);
 
+/** Matériel nécessaire à un programme (« none » = rien de spécial). */
+export const templateNeeds = (id: string): Needs => NEEDS[id] ?? "none";
+
 /** Programmes faisables avec ce matériel (la salle permet tout, les haltères permettent aussi le poids du corps). */
 export function templatesFor(o: { equipment: Equipment; sports: string[]; level: Level }): Template[] {
   return TEMPLATES.filter((t) => {
