@@ -178,12 +178,27 @@ export function normalizeWorkout(
 
 export type ImportedWeight = { date: string; weightKg: number; bodyFatPct: number | null };
 
+/** Raccourcis envoie l'échantillon Santé tel quel : liste (["72,5 kg"]) ou dictionnaire ({ value, unit… }). */
+const unwrapSample = (v: unknown): unknown => {
+  for (let i = 0; i < 3; i++) {
+    if (Array.isArray(v)) v = v[0];
+    else if (v && typeof v === "object") v = pick(v as Body, "value", "valeur", "quantity", "quantité", "weightKg", "weight", "poids");
+    else break;
+  }
+  if (typeof v === "string") v = v.replace(/\s+/g, " ").trim();
+  return v;
+};
+
 export function normalizeWeight(b: Body, now: Date): Result<ImportedWeight> {
-  const raw = pick(b, "weightKg", "weight", "poids", "value", "valeur");
+  const raw = unwrapSample(pick(b, "weightKg", "weight", "poids", "value", "valeur"));
   let kg = parseNumber(raw);
   if (kg !== null && unitOf(raw).startsWith("lb")) kg *= 0.45359237;
-  if (kg === null || kg < 20 || kg > 400) return { ok: false, error: "Poids manquant ou invalide (weightKg)" };
-  const d = parseDate(pick(b, "date", "startDate"));
+  if (kg !== null && unitOf(raw) === "g" && kg > 1000) kg /= 1000;
+  if (kg === null || kg < 20 || kg > 400) {
+    const got = raw === undefined ? "rien reçu" : `reçu : ${JSON.stringify(raw).slice(0, 60)}`;
+    return { ok: false, error: `Poids manquant ou invalide (weightKg, ${got})` };
+  }
+  const d = parseDate(unwrapSample(pick(b, "date", "startDate")));
   let bf = parseNumber(pick(b, "bodyFatPct", "bodyFat", "masseGrasse"));
   if (bf !== null && bf > 0 && bf <= 1) bf *= 100; // Santé exprime parfois la masse grasse en fraction
   return {
