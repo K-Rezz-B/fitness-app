@@ -82,6 +82,56 @@ export const TEMPLATES: Template[] = [
     ["Cat-cow", 2, "10"], ["World's greatest stretch", 2, "5/côté"], ["90/90 hanches", 2, "1 min"],
     ["Ouverture thoracique", 2, "10"], ["Étirement ischios", 2, "45 s"],
   ]),
+
+  // --- Salle : variantes pour les programmes du coach (full body B, haut / bas du corps) ---
+  T("fullbody-b", "muscu", "Full body B", 60, 7, "Polyarticulaires, variante", [
+    ["Soulevé de terre", 3, "5"], ["Développé militaire", 3, "6-8"], ["Tirage vertical", 3, "8-10"],
+    ["Presse à cuisses", 3, "10-12"], ["Gainage latéral", 3, "30 s/côté"],
+  ]),
+  T("upper", "muscu", "Haut du corps A", 55, 7, "Poussée + tirage, charges lourdes", [
+    ["Développé couché", 4, "6-8"], ["Rowing barre", 4, "6-8"], ["Développé militaire", 3, "8-10"],
+    ["Tirage vertical", 3, "10-12"], ["Curl haltères", 2, "12"], ["Extension triceps poulie", 2, "12"],
+  ]),
+  T("upper-b", "muscu", "Haut du corps B", 55, 7, "Volume haut du corps", [
+    ["Développé incliné haltères", 4, "8-10"], ["Tractions", 4, "max"], ["Élévations latérales", 3, "12-15"],
+    ["Rowing haltère", 3, "10/bras"], ["Face pull", 3, "15"],
+  ]),
+  T("lower-b", "muscu", "Bas du corps B", 55, 7, "Chaîne postérieure", [
+    ["Soulevé de terre roumain", 4, "8"], ["Fentes bulgares", 3, "10/jambe"], ["Leg curl", 3, "12"],
+    ["Hip thrust", 3, "10"], ["Gainage planche", 3, "45 s"],
+  ]),
+
+  // --- Maison avec haltères ---
+  T("db-fullbody-a", "muscu", "Full body haltères A", 45, 7, "Maison, haltères", [
+    ["Goblet squat", 4, "10-12"], ["Développé couché haltères (sol)", 4, "10"], ["Rowing haltère", 3, "10/bras"],
+    ["Fentes arrière haltères", 3, "10/jambe"], ["Gainage planche", 3, "45 s"],
+  ]),
+  T("db-fullbody-b", "muscu", "Full body haltères B", 45, 7, "Maison, haltères", [
+    ["Soulevé de terre roumain haltères", 4, "10"], ["Développé militaire haltères", 3, "10"], ["Pompes", 3, "max"],
+    ["Squat bulgare haltères", 3, "10/jambe"], ["Rowing penché haltères", 3, "12"],
+  ]),
+  T("db-upper", "muscu", "Haut du corps haltères", 45, 7, "Maison, haltères", [
+    ["Développé couché haltères (sol)", 4, "8-10"], ["Rowing haltère", 4, "10/bras"], ["Développé militaire haltères", 3, "10"],
+    ["Élévations latérales", 3, "12-15"], ["Curl haltères", 3, "12"],
+  ]),
+  T("db-lower", "muscu", "Bas du corps haltères", 45, 7, "Maison, haltères", [
+    ["Goblet squat", 4, "10-12"], ["Soulevé de terre roumain haltères", 4, "10"], ["Squat bulgare haltères", 3, "10/jambe"],
+    ["Hip thrust haltère", 3, "12"], ["Mollets debout", 3, "15"],
+  ]),
+
+  // --- Sans matériel ---
+  T("bw-fullbody", "calisthenics", "Full body sans matériel", 35, 7, "Force au poids du corps", [
+    ["Burpees", 3, "10"], ["Pompes", 4, "max"], ["Squat bulgare (chaise)", 3, "10/jambe"],
+    ["Rowing sous une table", 3, "10"], ["Gainage planche", 3, "45 s"],
+  ]),
+  T("bw-upper", "calisthenics", "Haut du corps sans matériel", 35, 7, "Poussée + tirage au poids du corps", [
+    ["Pompes", 4, "max"], ["Pompes déclinées", 3, "10"], ["Rowing sous une table", 4, "10-12"],
+    ["Dips sur chaise", 3, "12"], ["Pike push-ups", 3, "8"], ["Superman", 3, "15"],
+  ]),
+  T("bw-lower", "calisthenics", "Bas du corps sans matériel", 35, 7, "Jambes & fessiers au poids du corps", [
+    ["Squats", 4, "20"], ["Fentes sautées", 3, "10/jambe"], ["Squat bulgare (chaise)", 3, "12/jambe"],
+    ["Pont fessier une jambe", 3, "12/jambe"], ["Chaise murale", 3, "45 s"], ["Mollets une jambe", 3, "15"],
+  ]),
 ];
 
 export const templateById = (id: string) => TEMPLATES.find((t) => t.id === id);

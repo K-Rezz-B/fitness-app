@@ -1,5 +1,5 @@
 import "server-only";
-import { getPlans, getWorkouts } from "./data";
+import { getActivity, getPlans, getWorkouts } from "./data";
 import { computeStats } from "./stats";
 import { remainingThisWeek } from "./notifications";
 import { TZ, WEEKDAYS, typeInfo } from "./constants";
@@ -11,7 +11,7 @@ const nowHHMM = () =>
 
 /** Résumé compact du profil pour le widget (Scriptable) et les intégrations. */
 export async function buildSummary(p: Profile, origin: string) {
-  const [all, plans] = await Promise.all([getWorkouts(p.id), getPlans(p.id)]);
+  const [all, plans, activity] = await Promise.all([getWorkouts(p.id), getPlans(p.id), getActivity(p.id, 1)]);
   const s = computeStats(all, p.weeklySessionsTarget);
   const t = today();
   const wd = isoWeekday(t);
@@ -43,6 +43,7 @@ export async function buildSummary(p: Profile, origin: string) {
     week: { sessions: s.current.sessions, target: s.weeklyTarget, minutes: s.current.minutes, remaining: remainingThisWeek(s) },
     streak: { days: s.dayStreak, weeks: s.weekStreak },
     workedOutToday: doneToday.length > 0,
+    activity: activity[0]?.date === t ? { steps: activity[0].steps, activeKcal: activity[0].activeKcal, stepsGoal: p.stepsGoal, moveGoalKcal: p.moveGoalKcal } : null,
     today: todayPlans,
     next: upcoming
       ? {

@@ -105,6 +105,14 @@ export default async function Profile({ searchParams }: PageProps<"/profile">) {
               <label className="label">Séances / semaine</label>
               <input name="weeklySessionsTarget" type="number" min={1} max={14} defaultValue={p.weeklySessionsTarget} className="input" />
             </div>
+            <div>
+              <label className="label">Objectif Bouger (kcal/j)</label>
+              <input name="moveGoalKcal" type="number" inputMode="numeric" min={50} max={3000} step={10} defaultValue={p.moveGoalKcal} className="input" />
+            </div>
+            <div>
+              <label className="label">Objectif pas / jour</label>
+              <input name="stepsGoal" type="number" inputMode="numeric" min={1000} max={30000} step={500} defaultValue={p.stepsGoal} className="input" />
+            </div>
             <button className="btn-primary col-span-2">Enregistrer</button>
           </form>
         </section>

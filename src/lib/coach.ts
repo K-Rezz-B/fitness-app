@@ -1,4 +1,4 @@
-import type { Profile, Weight } from "./schema";
+import type { DailyActivity, Profile, Weight } from "./schema";
 import { ACTIVITY_LEVELS } from "./constants";
 import { ageFrom, addDays, today } from "./dates";
 import type { Stats } from "./stats";
@@ -13,7 +13,21 @@ export const SOURCES = {
   gabbett: "Gabbett, Br J Sports Med 2016 (ACWR)",
   efsa: "EFSA, Dietary Reference Values for water, 2010",
   bmi: "OMS, classification IMC",
+  tudor: "Tudor-Locke & Bassett, Sports Med 2004 (niveaux d'activité selon les pas/jour)",
+  paluch: "Paluch et al., Lancet Public Health 2022 (pas/jour et mortalité)",
 };
+
+type LevelKey = keyof typeof ACTIVITY_LEVELS;
+/** Niveau d'activité déduit des pas quotidiens (Tudor-Locke 2004) */
+export const levelFromSteps = (steps: number): LevelKey =>
+  steps < 5000 ? "sedentary" : steps < 7500 ? "light" : steps < 10000 ? "moderate" : steps < 12500 ? "active" : "athlete";
+
+/** Moyenne des pas sur les 14 derniers jours complets (au moins 7 jours de données), sinon null. */
+export function stepsAverage(activity: DailyActivity[], todayKey: string): number | null {
+  const from = addDays(todayKey, -14);
+  const days = activity.filter((a) => a.steps !== null && a.date >= from && a.date < todayKey);
+  return days.length >= 7 ? Math.round(days.reduce((s, a) => s + (a.steps ?? 0), 0) / days.length) : null;
+}
 
 export function movingAverage(ws: Weight[], days = 7) {
   const sorted = [...ws].sort((a, b) => a.date.localeCompare(b.date));
@@ -24,7 +38,7 @@ export function movingAverage(ws: Weight[], days = 7) {
   });
 }
 
-export function coach(p: Profile | undefined, ws: Weight[], stats: Stats) {
+export function coach(p: Profile | undefined, ws: Weight[], stats: Stats, activity: DailyActivity[] = []) {
   const advice: Advice[] = [];
   const latest = [...ws].sort((a, b) => b.date.localeCompare(a.date))[0];
   const age = ageFrom(p?.birthDate);
@@ -46,7 +60,11 @@ export function coach(p: Profile | undefined, ws: Weight[], stats: Stats) {
   const healthyRange = [18.5 * m * m, 24.9 * m * m];
 
   const bmr = 10 * kg + 6.25 * h - 5 * age + (p.sex === "female" ? -161 : 5);
-  const factor = ACTIVITY_LEVELS[p.activityLevel as keyof typeof ACTIVITY_LEVELS]?.factor ?? 1.55;
+  // Niveau d'activité : mesuré par les pas (Apple Santé) si assez de données, sinon celui du profil
+  const stepsAvg = stepsAverage(activity, today());
+  const levelKey: LevelKey = stepsAvg !== null ? levelFromSteps(stepsAvg) : ((p.activityLevel in ACTIVITY_LEVELS ? p.activityLevel : "moderate") as LevelKey);
+  const factor = ACTIVITY_LEVELS[levelKey].factor;
+  const activitySource = stepsAvg !== null ? ("pas" as const) : ("profil" as const);
   const tdee = bmr * factor;
   const goalAdj = { lose: -0.2, maintain: 0, gain: 0.1, performance: 0.05 }[p.goal] ?? 0;
   const calories = Math.max(Math.round(bmr * 1.1), Math.round(tdee * (1 + goalAdj)));
@@ -108,6 +126,16 @@ export function coach(p: Profile | undefined, ws: Weight[], stats: Stats) {
       advice.push({ level: "info", title: "Charge en baisse", body: `Ratio ${stats.acwr.toFixed(2)} (< 0,8) : tu peux augmenter progressivement (+10 %/sem).`, source: SOURCES.gabbett });
   }
 
+  if (stepsAvg !== null) {
+    const fmt = new Intl.NumberFormat("fr-FR").format(stepsAvg);
+    if (stepsAvg >= 8000)
+      advice.push({ level: "good", title: "Activité quotidienne au top", body: `${fmt} pas/j en moyenne sur 14 j : au-dessus du seuil associé au plus gros bénéfice santé.`, source: SOURCES.paluch });
+    else if (stepsAvg >= 7000)
+      advice.push({ level: "info", title: "Presque 8 000 pas/j", body: `${fmt} pas/j en moyenne : encore ~${new Intl.NumberFormat("fr-FR").format(8000 - stepsAvg)} pas/j (un trajet à pied, un appel en marchant).`, source: SOURCES.paluch });
+    else
+      advice.push({ level: "info", title: "Bouge plus au quotidien", body: `${fmt} pas/j en moyenne sur 14 j. Monter vers 7 000-8 000 pas/j réduit nettement la mortalité : ajoute ~1 000 pas/j chaque semaine.`, source: SOURCES.paluch });
+  }
+
   if (stats.daysSinceLast !== null && stats.daysSinceLast >= 4)
     advice.push({ level: "warning", title: `${stats.daysSinceLast} jours sans séance`, body: "Même 20 minutes aujourd'hui suffisent à garder l'élan. 💪" });
 
@@ -132,6 +160,9 @@ export function coach(p: Profile | undefined, ws: Weight[], stats: Stats) {
     healthyRange,
     bmr: Math.round(bmr),
     tdee: Math.round(tdee),
+    stepsAvg,
+    activitySource,
+    activityLabel: activitySource === "pas" ? ACTIVITY_LEVELS[levelKey].label.replace(/\s*\(.*\)$/, "") : ACTIVITY_LEVELS[levelKey].label,
     calories,
     protein,
     fat,

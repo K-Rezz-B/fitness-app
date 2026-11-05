@@ -250,6 +250,8 @@ export async function saveProfile(f: FormData) {
     goal: str(f, "goal") || "maintain",
     targetWeightKg: num(f, "targetWeightKg"),
     weeklySessionsTarget: clamp(Math.round(num(f, "weeklySessionsTarget") ?? 3), 1, 14),
+    moveGoalKcal: clamp(Math.round(num(f, "moveGoalKcal") ?? 400), 50, 3000),
+    stepsGoal: clamp(Math.round(num(f, "stepsGoal") ?? 8000), 1000, 30000),
     updatedAt: new Date(),
   };
   await db.update(profile).set(values).where(eq(profile.id, pid));

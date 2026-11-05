@@ -60,6 +60,7 @@ export default async function Integrations() {
   const token = me.apiToken;
   const workoutsUrl = `${origin}/api/v1/workouts`;
   const weightsUrl = `${origin}/api/v1/weights`;
+  const activityUrl = `${origin}/api/v1/activity`;
   const auth = token ? `Bearer ${token}` : "Bearer <jeton>";
 
   return (
@@ -107,6 +108,10 @@ export default async function Integrations() {
           <div>
             <div className="label">URL pesées</div>
             <div className="flex items-center gap-2"><Code>{weightsUrl}</Code><CopyButton text={weightsUrl} /></div>
+          </div>
+          <div>
+            <div className="label">URL activité (app Forme)</div>
+            <div className="flex items-center gap-2"><Code>{activityUrl}</Code><CopyButton text={activityUrl} /></div>
           </div>
           <div className="sm:col-span-2">
             <div className="label">En-tête (les 2 URL)</div>
@@ -184,6 +189,24 @@ export default async function Integrations() {
               </li>
             </Steps>
             <p className="text-xs text-muted">La même pesée n&apos;est jamais ajoutée deux fois.</p>
+          </Recipe>
+
+          <Recipe title="🔥 Activité du jour — anneau Bouger et pas (app Forme)">
+            <Steps>
+              <li>Automatisation › <b>Heure de la journée</b> (ex. <b>22:30</b>, chaque jour) › <b>Exécuter immédiatement</b>.</li>
+              <li>
+                <b>Rechercher des échantillons de santé</b> : Type <b>Nombre de pas</b>, Date de début <b>est aujourd&apos;hui</b>. Puis de même pour <b>Énergie active</b> et <b>Distance (marche et course)</b>.
+              </li>
+              <li>
+                <b>Obtenir le contenu de l&apos;URL</b> : <Code>{activityUrl}</Code>, POST, même en-tête, JSON : <Code>steps</Code>, <Code>activeKcal</Code>, <Code>distanceKm</Code> = chacun des résultats (FitPulse additionne les échantillons). Avec une Watch : <Code>exerciseMin</Code> et <Code>standHours</Code> en plus.
+              </li>
+            </Steps>
+            <p>
+              Résultat : les anneaux du jour sur l&apos;accueil, et le coach calcule ta dépense avec ton <b>niveau d&apos;activité mesuré</b> (moyenne des pas sur 14 jours) au lieu de celui déclaré.
+            </p>
+            <p className="text-xs text-muted">
+              Renvoyer le même jour remplace les totaux (tu peux le lancer plusieurs fois par jour). Si plusieurs apps comptent tes pas, ajoute le filtre <b>Source</b> = ton iPhone pour éviter les doublons. Rattrapage possible : envoie un tableau de jours avec un champ <Code>date</Code>.
+            </p>
           </Recipe>
 
           {token && (

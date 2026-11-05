@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { AlertTriangle, CheckCircle2, Info } from "lucide-react";
-import { getWeights, getWorkouts } from "@/lib/data";
+import { getActivity, getWeights, getWorkouts } from "@/lib/data";
 import { requireProfile } from "@/lib/session";
 import { computeStats } from "@/lib/stats";
 import { coach, movingAverage, SOURCES } from "@/lib/coach";
@@ -21,9 +21,9 @@ const LEVEL_LABEL = { good: "Top", info: "Conseil", warning: "Attention" };
 
 export default async function Coach() {
   const p = await requireProfile();
-  const [ws, all] = await Promise.all([getWeights(p.id), getWorkouts(p.id)]);
+  const [ws, all, activity] = await Promise.all([getWeights(p.id), getWorkouts(p.id), getActivity(p.id, 15)]);
   const stats = computeStats(all, p.weeklySessionsTarget);
-  const c = coach(p, ws, stats);
+  const c = coach(p, ws, stats, activity);
   const chart = movingAverage(ws.filter((w) => w.date >= addDays(today(), -120))).map((d) => ({ ...d, label: fmtDate(d.date) }));
 
   if (!c.ready) {
@@ -44,7 +44,7 @@ export default async function Coach() {
       <section className="mb-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
         <Stat label="Poids" value={c.kg.toFixed(1)} unit="kg" sub={c.weeklyRate !== null ? `${c.weeklyRate > 0 ? "+" : ""}${c.weeklyRate.toFixed(2)} kg/sem` : "Tendance : 2 sem. de données"} />
         <Stat label="IMC" value={c.bmi.toFixed(1)} sub={`${c.bmiLabel} · zone ${c.healthyRange[0].toFixed(0)}-${c.healthyRange[1].toFixed(0)} kg`} />
-        <Stat label="Métabolisme" value={c.bmr} unit="kcal" sub={`Dépense totale ≈ ${c.tdee} kcal`} />
+        <Stat label="Métabolisme" value={c.bmr} unit="kcal" sub={`Dépense totale ≈ ${c.tdee} kcal${c.stepsAvg !== null ? ` · ${new Intl.NumberFormat("fr-FR").format(c.stepsAvg)} pas/j mesurés` : ""}`} />
         <Stat label="Objectif" value={c.target ?? "—"} unit={c.target ? "kg" : undefined} sub={c.eta ? `≈ ${c.eta} sem. à rythme sain` : "Définis un poids cible"} />
       </section>
 
@@ -69,7 +69,7 @@ export default async function Coach() {
             <span>💧 Eau</span>
             <span className="font-mono tabular-nums">{c.waterL} L/j</span>
           </div>
-          <p className="mt-3 text-[11px] text-muted">Mifflin-St Jeor × facteur d&apos;activité, ajusté à l&apos;objectif. Estimation : ajuste selon ta tendance de poids sur 2-3 semaines.</p>
+          <p className="mt-3 text-[11px] text-muted">Mifflin-St Jeor × facteur d&apos;activité ({c.activitySource === "pas" ? <>mesuré par tes pas Apple Santé : <b>{c.activityLabel}</b></> : <>déclaré dans ton profil : {c.activityLabel}</>}), ajusté à l&apos;objectif. Estimation : ajuste selon ta tendance de poids sur 2-3 semaines.</p>
         </section>
 
         <section className="card lg:col-span-3">

@@ -97,3 +97,48 @@ export function SplitBar({ split }: { split: { category: Category; minutes: numb
     </div>
   );
 }
+
+/** Deux anneaux concentriques façon app Forme : énergie active (extérieur) et pas (intérieur). */
+export function ActivityRings({ kcal, kcalGoal, steps, stepsGoal, size = 120 }: { kcal: number; kcalGoal: number; steps: number; stepsGoal: number; size?: number }) {
+  const rings = [
+    { value: kcal / Math.max(1, kcalGoal), color: "#d95926", r: size / 2 - 8 },
+    { value: steps / Math.max(1, stepsGoal), color: "#c6f432", r: size / 2 - 24 },
+  ];
+  return (
+    <svg width={size} height={size} className="-rotate-90" role="img" aria-label={`Bouger ${Math.round(rings[0].value * 100)} %, pas ${Math.round(rings[1].value * 100)} %`}>
+      {rings.map(({ value, color, r }) => {
+        const c = 2 * Math.PI * r;
+        return (
+          <g key={color}>
+            <circle cx={size / 2} cy={size / 2} r={r} stroke={color} strokeOpacity={0.18} strokeWidth={12} fill="none" />
+            <circle cx={size / 2} cy={size / 2} r={r} stroke={color} strokeWidth={12} fill="none" strokeLinecap="round" strokeDasharray={`${c * Math.min(1, value)} ${c}`} />
+          </g>
+        );
+      })}
+    </svg>
+  );
+}
+
+/** Pas des 7 derniers jours (barres), objectif en pointillé. */
+export function StepsBars({ days, goal }: { days: { date: string; steps: number | null }[]; goal: number }) {
+  const max = Math.max(goal * 1.2, ...days.map((d) => d.steps ?? 0));
+  return (
+    <div className="relative">
+      <div className="absolute inset-x-0 border-t border-dashed border-accent/50" style={{ bottom: `${(goal / max) * 64 + 16}px` }} />
+      <div className="flex items-end gap-1.5">
+        {days.map((d) => (
+          <div key={d.date} className="flex flex-1 flex-col items-center gap-1">
+            <div className="flex h-16 w-full items-end">
+              <div
+                className={`w-full rounded-md ${(d.steps ?? 0) >= goal ? "bg-accent" : "bg-surface-2"}`}
+                style={{ height: `${Math.max(4, ((d.steps ?? 0) / max) * 64)}px` }}
+                title={`${d.steps ?? "—"} pas`}
+              />
+            </div>
+            <span className="text-[10px] text-muted">{fmtDate(d.date, { weekday: "narrow", day: undefined, month: undefined })}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
