@@ -7,7 +7,9 @@ import { and, eq, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { plans, profile, videos, weights, workouts, type Exercise } from "@/lib/schema";
 import { SESSION_COOKIE, checkPassword, sessionToken } from "@/lib/auth";
-import { PROFILE_COOKIE, requireAuth, requireProfile } from "@/lib/session";
+import { after } from "next/server";
+import { COOKIE_OPTS, PROFILE_COOKIE, requireAuth, requireProfile } from "@/lib/session";
+import { notifyNewBadges } from "@/lib/push";
 import { detectPlatform } from "@/lib/video";
 import { PROFILE_EMOJIS, TYPE_BY_ID } from "@/lib/constants";
 
@@ -27,13 +29,6 @@ const idOf = (f: FormData) => {
 function revalidateAll() {
   revalidatePath("/", "layout");
 }
-const COOKIE_OPTS = {
-  httpOnly: true,
-  secure: process.env.NODE_ENV === "production",
-  sameSite: "lax",
-  path: "/",
-  maxAge: 60 * 60 * 24 * 365,
-} as const;
 /** id du profil actif (redirige vers le sélecteur s'il n'y en a pas) */
 const currentPid = async () => (await requireProfile()).id;
 
@@ -90,7 +85,8 @@ export async function deleteProfile(f: FormData) {
 
 // ---------- séances ----------
 export async function saveWorkout(f: FormData) {
-  const pid = await currentPid();
+  const me = await requireProfile();
+  const pid = me.id;
   const type = str(f, "type");
   if (!TYPE_BY_ID[type]) throw new Error("Type inconnu");
   let exercises: Exercise[] = [];
@@ -123,7 +119,10 @@ export async function saveWorkout(f: FormData) {
   };
   const id = idOf(f);
   if (id) await db.update(workouts).set(values).where(and(eq(workouts.id, id), eq(workouts.profileId, pid)));
-  else await db.insert(workouts).values({ ...values, profileId: pid });
+  else {
+    const [row] = await db.insert(workouts).values({ ...values, profileId: pid }).returning({ id: workouts.id });
+    after(() => notifyNewBadges(me, row.id)); // push « nouveau badge » sur les autres appareils
+  }
   revalidateAll();
   redirect(id ? "/workouts" : "/?saved=1");
 }

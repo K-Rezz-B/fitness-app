@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ArrowLeftRight, Trash2 } from "lucide-react";
+import { Apple, ArrowLeftRight, ChevronRight, Trash2 } from "lucide-react";
 import { getWeights } from "@/lib/data";
 import { requireProfile } from "@/lib/session";
 import { ACTIVITY_LEVELS, GOALS } from "@/lib/constants";
@@ -109,6 +109,15 @@ export default async function Profile({ searchParams }: PageProps<"/profile">) {
           </form>
         </section>
       </div>
+
+      <Link href="/integrations" className="card mt-4 flex items-center gap-3 p-4 transition hover:border-muted">
+        <Apple size={20} className="shrink-0 text-accent" />
+        <span className="min-w-0 flex-1">
+          <span className="block font-semibold">Apple Santé, Watch, notifications, Face ID & widget</span>
+          <span className="block text-xs text-muted">Import automatique des séances, rappels, connexion sans mot de passe</span>
+        </span>
+        <ChevronRight size={16} className="text-muted" />
+      </Link>
 
       <details className="card mt-4">
         <summary className="cursor-pointer text-sm font-semibold text-critical">Supprimer le profil « {p.name} »</summary>

@@ -1,6 +1,6 @@
-// Service worker minimal : app installable + page hors-ligne.
+// Service worker : app installable, page hors-ligne, notifications push + pastille d'icône.
 // Pas de cache des données (toujours fraîches et synchronisées iPhone ↔ Mac).
-const CACHE = "fitpulse-v1";
+const CACHE = "fitpulse-v2";
 const OFFLINE = "/offline.html";
 
 self.addEventListener("install", (e) => {
@@ -40,4 +40,45 @@ self.addEventListener("fetch", (e) => {
   if (req.mode === "navigate") {
     e.respondWith(fetch(req).catch(() => caches.match(OFFLINE)));
   }
+});
+
+// ---------- Notifications push (iOS 16.4+ : app ajoutée à l'écran d'accueil) ----------
+self.addEventListener("push", (e) => {
+  let data = {};
+  try {
+    data = e.data ? e.data.json() : {};
+  } catch {
+    data = { body: e.data && e.data.text() };
+  }
+  const title = data.title || "FitPulse";
+  const tasks = [
+    self.registration.showNotification(title, {
+      body: data.body || "",
+      icon: "/icons/icon-192.png",
+      badge: "/icons/icon-192.png",
+      tag: data.tag,
+      data: { url: data.url || "/" },
+    }),
+  ];
+  // Pastille sur l'icône : séances restantes cette semaine
+  if (typeof data.badge === "number" && "setAppBadge" in self.navigator) {
+    tasks.push(data.badge > 0 ? self.navigator.setAppBadge(data.badge) : self.navigator.clearAppBadge());
+  }
+  e.waitUntil(Promise.all(tasks).catch(() => {}));
+});
+
+self.addEventListener("notificationclick", (e) => {
+  e.notification.close();
+  const url = new URL((e.notification.data && e.notification.data.url) || "/", self.location.origin).href;
+  e.waitUntil(
+    self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((list) => {
+      for (const c of list) {
+        if (c.url.startsWith(self.location.origin) && "focus" in c) {
+          c.navigate(url).catch(() => {});
+          return c.focus();
+        }
+      }
+      return self.clients.openWindow(url);
+    }),
+  );
 });

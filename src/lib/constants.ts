@@ -28,6 +28,7 @@ export const WORKOUT_TYPES: WorkoutType[] = [
   { id: "marche", label: "Marche / Rando", emoji: "🥾", category: "cardio", met: 4.3, hasDistance: true },
   { id: "boxe", label: "Boxe / Combat", emoji: "🥊", category: "cardio", met: 9 },
   { id: "sport", label: "Sport collectif", emoji: "⚽", category: "cardio", met: 7 },
+  { id: "cardio", label: "Cardio (autre)", emoji: "❤️‍🔥", category: "cardio", met: 6 },
   { id: "yoga", label: "Yoga", emoji: "🧘", category: "mobilite", met: 2.8 },
   { id: "mobilite", label: "Mobilité / Stretching", emoji: "🌀", category: "mobilite", met: 2.3 },
 ];

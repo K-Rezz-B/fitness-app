@@ -12,7 +12,8 @@ export async function proxy(request: NextRequest) {
 
 export const config = {
   matcher: [
-    // Tout sauf : assets, login, manifest/icônes, service worker, flux calendrier (protégé par jeton)
-    "/((?!_next/static|_next/image|login|api/calendar|manifest.webmanifest|sw.js|icons/|favicon.ico|apple-icon.png|icon.png|offline.html).*)",
+    // Tout sauf : assets, login, manifest/icônes, service worker,
+    // flux calendrier + API Raccourcis/widget (jeton) + cron Vercel (CRON_SECRET)
+    "/((?!_next/static|_next/image|login|api/calendar|api/v1/|api/cron/|manifest.webmanifest|sw.js|icons/|favicon.ico|apple-icon.png|icon.png|offline.html).*)",
   ],
 };

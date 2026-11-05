@@ -15,6 +15,13 @@
       "when": 1793871676644,
       "tag": "0001_profiles",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1793874747930,
+      "tag": "0002_apple_integrations",
+      "breakpoints": true
     }
   ]
 }

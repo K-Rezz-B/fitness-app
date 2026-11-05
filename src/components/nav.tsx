@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, Dumbbell, CalendarClock, PlaySquare, Brain, Plus, UserRound, ArrowLeftRight } from "lucide-react";
+import { Home, Dumbbell, CalendarClock, PlaySquare, Brain, Plus, UserRound, ArrowLeftRight, Apple } from "lucide-react";
 import clsx from "clsx";
 
 const ITEMS = [
@@ -26,7 +26,7 @@ export function Sidebar({ profile }: { profile: { name: string; emoji: string } 
         <Plus size={18} /> Nouvelle séance
       </Link>
       <nav className="flex flex-col gap-1">
-        {[...ITEMS, { href: "/profile", label: "Profil", icon: UserRound }].map(({ href, label, icon: Icon }) => (
+        {[...ITEMS, { href: "/integrations", label: "Apple", icon: Apple }, { href: "/profile", label: "Profil", icon: UserRound }].map(({ href, label, icon: Icon }) => (
           <Link
             key={href}
             href={href}
