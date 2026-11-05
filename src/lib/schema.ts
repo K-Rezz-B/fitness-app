@@ -34,6 +34,8 @@ export const profile = pgTable("profile", {
   notifyStreak: boolean("notify_streak").notNull().default(true),
   notifyWeekly: boolean("notify_weekly").notNull().default(true),
   notifyBadges: boolean("notify_badges").notNull().default(true),
+  /** Apparaît dans le classement des défis entre profils (et peut voir celui des autres) */
+  shareChallenges: boolean("share_challenges").notNull().default(false),
   /** Début d'exercice Apple Watch reçu, en attente du signal de fin */
   pendingWorkoutStart: timestamp("pending_workout_start", { withTimezone: true }),
   pendingWorkoutType: text("pending_workout_type"),

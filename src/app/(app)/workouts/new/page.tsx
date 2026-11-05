@@ -9,6 +9,8 @@ import { today } from "@/lib/dates";
 import { coachVideosFor } from "@/lib/video-coach";
 import { PageHeader } from "@/components/ui";
 import { WorkoutForm } from "@/components/workout-form";
+import { exerciseIndex, exerciseMemos } from "@/lib/records";
+import type { LastWorkout } from "@/components/workout-form";
 import { TemplatePicker } from "./picker";
 
 export const metadata: Metadata = { title: "Nouvelle séance" };
@@ -39,11 +41,16 @@ export default async function NewWorkout({ searchParams }: PageProps<"/workouts/
       ? { templateId: tpl?.id, type: initial.type, durationMin: initial.durationMin ?? 45 }
       : null;
   const coach = session ? coachVideosFor({ library: videos, session, profile: me, workouts: history, day: today() }) : undefined;
+  // Historique pour « dernière fois », records en direct et « refaire ma dernière séance »
+  const memos = exerciseMemos(exerciseIndex(history));
+  const lastByType: Record<string, LastWorkout> = {};
+  for (const w of history) // du plus récent au plus ancien
+    lastByType[w.type] ??= { title: w.title, durationMin: w.durationMin, rpe: w.rpe, exercises: w.exercises, date: w.date.toISOString() };
   return (
     <>
       <PageHeader title="Nouvelle séance" subtitle={plan ? `🧠 Prévue par ton coach · ${plan.notes ?? ""}` : "Chaque séance loggée = XP + score 📈"} />
       {!plan && <TemplatePicker current={tpl?.id} doable={templatesForProfile(me).list} showAll={one(sp.all) === "1"} />}
-      <WorkoutForm key={plan ? `plan-${plan.id}` : (tpl?.id ?? type ?? "blank")} initial={initial} videos={videos.map((v) => ({ id: v.id, title: v.title }))} weightKg={ws[0]?.weightKg} coach={coach} />
+      <WorkoutForm key={plan ? `plan-${plan.id}` : (tpl?.id ?? type ?? "blank")} initial={initial} videos={videos.map((v) => ({ id: v.id, title: v.title }))} weightKg={ws[0]?.weightKg} coach={coach} pid={pid} memos={memos} lastByType={lastByType} autoLive={one(sp.live) === "1"} />
     </>
   );
 }

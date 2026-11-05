@@ -6,6 +6,7 @@ import { requireProfile } from "@/lib/session";
 import { CATEGORIES, typeInfo } from "@/lib/constants";
 import { dayKey, fmtDate, fmtTime, weekStart } from "@/lib/dates";
 import { Empty, PageHeader } from "@/components/ui";
+import { ProgressLinks } from "@/components/progress-links";
 
 export const metadata: Metadata = { title: "Séances" };
 
@@ -23,6 +24,7 @@ export default async function Workouts() {
         subtitle={`${all.length} séance(s) au compteur`}
         action={<Link href="/workouts/new" className="btn-primary hidden md:inline-flex"><Plus size={16} /> Ajouter</Link>}
       />
+      {all.length > 0 && <ProgressLinks />}
       {all.length === 0 ? (
         <Empty emoji="🏁" title="Aucune séance pour l'instant">
           Lance-toi : <Link href="/workouts/new" className="text-accent">enregistre ta première séance</Link> et débloque ton premier badge.

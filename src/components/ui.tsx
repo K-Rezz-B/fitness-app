@@ -47,7 +47,7 @@ export function Empty({ emoji, title, children }: { emoji: string; title: string
 export function Progress({ value, className }: { value: number; className?: string }) {
   return (
     <div className={clsx("h-2 overflow-hidden rounded-full bg-surface-2", className)}>
-      <div className="h-full rounded-full bg-accent" style={{ width: `${Math.round(Math.min(1, Math.max(0, value)) * 100)}%` }} />
+      <div className="animate-grow-x h-full rounded-full bg-accent" style={{ width: `${Math.round(Math.min(1, Math.max(0, value)) * 100)}%` }} />
     </div>
   );
 }

@@ -1,6 +1,8 @@
 // Service worker : app installable, page hors-ligne, notifications push + pastille d'icône.
-// Pas de cache des données (toujours fraîches et synchronisées iPhone ↔ Mac).
-const CACHE = "fitpulse-v2";
+// Pas de cache des données (toujours fraîches et synchronisées iPhone ↔ Mac), sauf le formulaire
+// « Nouvelle séance » : gardé pour pouvoir saisir une séance sans réseau (envoyée plus tard par <OutboxSync>).
+const CACHE = "fitpulse-v3";
+const NEW_WORKOUT = "/workouts/new";
 const OFFLINE = "/offline.html";
 
 self.addEventListener("install", (e) => {
@@ -36,9 +38,20 @@ self.addEventListener("fetch", (e) => {
     );
     return;
   }
-  // Navigations : réseau, sinon page hors-ligne
+  // Navigations : réseau, sinon page hors-ligne (ou dernier formulaire de séance connu)
   if (req.mode === "navigate") {
-    e.respondWith(fetch(req).catch(() => caches.match(OFFLINE)));
+    const isForm = url.pathname === NEW_WORKOUT;
+    e.respondWith(
+      fetch(req)
+        .then((res) => {
+          if (isForm && res.ok && !res.redirected) {
+            const copy = res.clone();
+            caches.open(CACHE).then((c) => c.put(NEW_WORKOUT, copy));
+          }
+          return res;
+        })
+        .catch(async () => (isForm && (await caches.match(NEW_WORKOUT))) || caches.match(OFFLINE)),
+    );
   }
 });
 

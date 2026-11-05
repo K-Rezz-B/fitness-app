@@ -9,6 +9,7 @@ import { GOALS } from "@/lib/constants";
 import { addDays, fmtDate, today } from "@/lib/dates";
 import { Empty, PageHeader, Stat } from "@/components/ui";
 import { WeightChart } from "@/components/charts";
+import { CountUp } from "@/components/count-up";
 
 export const metadata: Metadata = { title: "Coach" };
 
@@ -19,11 +20,24 @@ const ICON = {
 };
 const LEVEL_LABEL = { good: "Top", info: "Conseil", warning: "Attention" };
 
+/** Progression vers le poids cible depuis la première pesée, et date d'arrivée au rythme mesuré. */
+function weightGoal(ws: { date: string; weightKg: number }[], kg: number, target: number | null | undefined, weeklyRate: number | null) {
+  if (!target || !ws.length) return null;
+  const start = [...ws].sort((a, b) => a.date.localeCompare(b.date))[0].weightKg;
+  const total = target - start;
+  const progress = Math.abs(total) < 0.1 ? 1 : Math.min(1, Math.max(0, (kg - start) / total));
+  const left = Math.abs(target - kg);
+  const towards = weeklyRate !== null && Math.abs(weeklyRate) >= 0.05 && Math.sign(weeklyRate) === Math.sign(target - kg);
+  const trendDate = towards && left > 0.2 ? addDays(today(), Math.round((left / Math.abs(weeklyRate!)) * 7)) : null;
+  return { start, target, progress, left, trendDate };
+}
+
 export default async function Coach() {
   const p = await requireProfile();
   const [ws, all, activity] = await Promise.all([getWeights(p.id), getWorkouts(p.id), getActivity(p.id, 15)]);
   const stats = computeStats(all, p.weeklySessionsTarget);
   const c = coach(p, ws, stats, activity);
+  const goal = c.ready ? weightGoal(ws, c.kg, c.target, c.weeklyRate) : null;
   const chart = movingAverage(ws.filter((w) => w.date >= addDays(today(), -120))).map((d) => ({ ...d, label: fmtDate(d.date) }));
 
   if (!c.ready) {
@@ -48,6 +62,40 @@ export default async function Coach() {
         <Stat label="Objectif" value={c.target ?? "—"} unit={c.target ? "kg" : undefined} sub={c.eta ? `≈ ${c.eta} sem. à rythme sain` : "Définis un poids cible"} />
       </section>
 
+      {goal && (
+        <section className="card mb-4">
+          <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
+            <span className="text-sm font-semibold">🎯 Objectif de poids</span>
+            <span className="font-mono text-xs text-ink-2 tabular-nums">
+              {goal.start.toFixed(1)} kg → <b className="text-ink">{c.kg.toFixed(1)}</b> → {goal.target.toFixed(1)} kg
+            </span>
+          </div>
+          <div className="relative h-3 overflow-hidden rounded-full bg-surface-2">
+            <div className="animate-grow-x h-full rounded-full bg-gradient-to-r from-accent-2 to-accent" style={{ width: `${Math.round(goal.progress * 100)}%` }} />
+          </div>
+          <div className="mt-3 grid gap-2 text-sm sm:grid-cols-3">
+            <div>
+              <div className="font-mono text-2xl font-bold tabular-nums"><CountUp value={Math.round(goal.progress * 100)} /> %</div>
+              <div className="text-xs text-muted">du chemin parcouru</div>
+            </div>
+            <div>
+              <div className="font-mono text-2xl font-bold tabular-nums"><CountUp value={goal.left} decimals={1} /> kg</div>
+              <div className="text-xs text-muted">encore à {goal.target > c.kg ? "prendre" : "perdre"}</div>
+            </div>
+            <div>
+              <div className="text-base font-semibold">{goal.trendDate ? `≈ ${fmtDate(goal.trendDate, { year: "numeric" })}` : "—"}</div>
+              <div className="text-xs text-muted">
+                {goal.trendDate
+                  ? `à ton rythme actuel (${c.weeklyRate! > 0 ? "+" : ""}${c.weeklyRate!.toFixed(2)} kg/sem)`
+                  : c.weeklyRate === null
+                    ? "date estimée après 2 sem. de pesées"
+                    : "ta tendance ne va pas encore vers l'objectif"}
+              </div>
+            </div>
+          </div>
+        </section>
+      )}
+
       <div className="mb-4 grid gap-4 lg:grid-cols-5">
         <section className="card lg:col-span-2">
           <div className="mb-1 text-sm font-semibold">🍽️ Nutrition quotidienne</div>
@@ -62,7 +110,7 @@ export default async function Coach() {
                 <span>{m.label}</span>
                 <span className="font-mono tabular-nums">{m.g} g <span className="text-muted">· {Math.round((m.kcal / c.calories) * 100)} %</span></span>
               </div>
-              <div className="h-2 rounded-full bg-surface-2"><div className="h-full rounded-full bg-accent-2" style={{ width: `${Math.min(100, (m.kcal / c.calories) * 100)}%` }} /></div>
+              <div className="h-2 rounded-full bg-surface-2"><div className="animate-grow-x h-full rounded-full bg-accent-2" style={{ width: `${Math.min(100, (m.kcal / c.calories) * 100)}%` }} /></div>
             </div>
           ))}
           <div className="mt-4 flex justify-between border-t border-line pt-3 text-sm">

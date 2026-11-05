@@ -1,5 +1,17 @@
+import type { CSSProperties } from "react";
 import { CATEGORIES, type Category } from "@/lib/constants";
 import { fmtDate } from "@/lib/dates";
+import { CountUp } from "./count-up";
+
+/** Arc animé : se remplit de 0 à `value` (0-1) via stroke-dashoffset (voir .animate-ring). */
+function ringStyle(c: number, value: number, delay = 0) {
+  return {
+    strokeDasharray: c,
+    strokeDashoffset: c * (1 - Math.min(1, Math.max(0, value))),
+    "--ring-c": `${c}px`,
+    animationDelay: `${delay}ms`,
+  } as CSSProperties;
+}
 
 export function ScoreRing({ score, size = 148 }: { score: number; size?: number }) {
   const r = (size - 16) / 2;
@@ -23,12 +35,13 @@ export function ScoreRing({ score, size = 148 }: { score: number; size?: number 
           strokeWidth={12}
           fill="none"
           strokeLinecap="round"
-          strokeDasharray={`${(c * score) / 100} ${c}`}
+          className="animate-ring"
+          style={ringStyle(c, score / 100)}
         />
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center">
-        <span className="font-mono text-4xl font-bold tabular-nums">{score}</span>
-        <span className="text-[11px] text-ink-2">{label}</span>
+        <span className="font-mono text-4xl font-bold tabular-nums"><CountUp value={score} duration={1100} /></span>
+        <span className="animate-fade-up text-[11px] text-ink-2 [animation-delay:700ms]">{label}</span>
       </div>
     </div>
   );
@@ -49,8 +62,8 @@ export function Heatmap({ days, todayKey }: { days: { day: string; minutes: numb
             <span key={i} className="flex h-3.5 items-center">{d}</span>
           ))}
         </div>
-        {weeks.map((w) => (
-          <div key={w[0].day} className="grid grid-rows-7 gap-[3px]">
+        {weeks.map((w, wi) => (
+          <div key={w[0].day} className="animate-fade-up grid grid-rows-7 gap-[3px]" style={{ animationDelay: `${wi * 18}ms` }}>
             {w.map((d) => (
               <div
                 key={d.day}
@@ -77,7 +90,7 @@ export function SplitBar({ split }: { split: { category: Category; minutes: numb
   if (!total) return <p className="text-sm text-muted">Aucune séance sur 30 jours.</p>;
   return (
     <div>
-      <div className="flex h-3 gap-[2px] overflow-hidden rounded-full">
+      <div className="animate-grow-x flex h-3 gap-[2px] overflow-hidden rounded-full">
         {split.filter((s) => s.minutes > 0).map((s) => (
           <div key={s.category} style={{ width: `${(s.minutes / total) * 100}%`, background: CATEGORIES[s.category].color }} />
         ))}
@@ -89,7 +102,7 @@ export function SplitBar({ split }: { split: { category: Category; minutes: numb
               <span className="h-2.5 w-2.5 rounded-sm" style={{ background: CATEGORIES[s.category].color }} />
               {CATEGORIES[s.category].label}
             </div>
-            <div className="font-mono text-lg font-semibold tabular-nums">{Math.round((s.minutes / total) * 100)} %</div>
+            <div className="font-mono text-lg font-semibold tabular-nums"><CountUp value={Math.round((s.minutes / total) * 100)} /> %</div>
             <div className="font-mono text-xs text-muted tabular-nums">{s.minutes} min</div>
           </div>
         ))}
@@ -106,12 +119,12 @@ export function ActivityRings({ kcal, kcalGoal, steps, stepsGoal, size = 120 }: 
   ];
   return (
     <svg width={size} height={size} className="-rotate-90" role="img" aria-label={`Bouger ${Math.round(rings[0].value * 100)} %, pas ${Math.round(rings[1].value * 100)} %`}>
-      {rings.map(({ value, color, r }) => {
+      {rings.map(({ value, color, r }, i) => {
         const c = 2 * Math.PI * r;
         return (
           <g key={color}>
             <circle cx={size / 2} cy={size / 2} r={r} stroke={color} strokeOpacity={0.18} strokeWidth={12} fill="none" />
-            <circle cx={size / 2} cy={size / 2} r={r} stroke={color} strokeWidth={12} fill="none" strokeLinecap="round" strokeDasharray={`${c * Math.min(1, value)} ${c}`} />
+            <circle cx={size / 2} cy={size / 2} r={r} stroke={color} strokeWidth={12} fill="none" strokeLinecap="round" className="animate-ring" style={ringStyle(c, value, i * 150)} />
           </g>
         );
       })}
@@ -126,12 +139,12 @@ export function StepsBars({ days, goal }: { days: { date: string; steps: number 
     <div className="relative">
       <div className="absolute inset-x-0 border-t border-dashed border-accent/50" style={{ bottom: `${(goal / max) * 64 + 16}px` }} />
       <div className="flex items-end gap-1.5">
-        {days.map((d) => (
+        {days.map((d, i) => (
           <div key={d.date} className="flex flex-1 flex-col items-center gap-1">
             <div className="flex h-16 w-full items-end">
               <div
-                className={`w-full rounded-md ${(d.steps ?? 0) >= goal ? "bg-accent" : "bg-surface-2"}`}
-                style={{ height: `${Math.max(4, ((d.steps ?? 0) / max) * 64)}px` }}
+                style={{ height: `${Math.max(4, ((d.steps ?? 0) / max) * 64)}px`, animationDelay: `${i * 50}ms` }}
+                className={`animate-grow-y w-full rounded-md ${(d.steps ?? 0) >= goal ? "bg-accent" : "bg-surface-2"}`}
                 title={`${d.steps ?? "—"} pas`}
               />
             </div>

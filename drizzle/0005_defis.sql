@@ -1,0 +1,1 @@
+ALTER TABLE "profile" ADD COLUMN "share_challenges" boolean DEFAULT false NOT NULL;

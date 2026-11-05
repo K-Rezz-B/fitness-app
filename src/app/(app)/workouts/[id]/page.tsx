@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
-import { getWeights, getVideos, getWorkout } from "@/lib/data";
+import { getWeights, getVideos, getWorkout, getWorkouts } from "@/lib/data";
+import { exerciseIndex, exerciseMemos } from "@/lib/records";
 import { requireProfile } from "@/lib/session";
 import { PageHeader } from "@/components/ui";
 import { WorkoutForm } from "@/components/workout-form";
@@ -8,8 +9,9 @@ import { deleteWorkout } from "@/app/actions";
 export default async function EditWorkout({ params }: PageProps<"/workouts/[id]">) {
   const { id } = await params;
   const { id: pid } = await requireProfile();
-  const [w, videos, ws] = await Promise.all([getWorkout(pid, Number(id) || 0), getVideos(pid), getWeights(pid)]);
+  const [w, videos, ws, history] = await Promise.all([getWorkout(pid, Number(id) || 0), getVideos(pid), getWeights(pid), getWorkouts(pid)]);
   if (!w) notFound();
+  const memos = exerciseMemos(exerciseIndex(history.filter((x) => x.id !== w.id)));
   return (
     <>
       <PageHeader
@@ -21,7 +23,7 @@ export default async function EditWorkout({ params }: PageProps<"/workouts/[id]"
           </form>
         }
       />
-      <WorkoutForm initial={{ ...w, date: w.date.toISOString() }} videos={videos.map((v) => ({ id: v.id, title: v.title }))} weightKg={ws[0]?.weightKg} />
+      <WorkoutForm initial={{ ...w, date: w.date.toISOString() }} videos={videos.map((v) => ({ id: v.id, title: v.title }))} weightKg={ws[0]?.weightKg} pid={pid} memos={memos} />
     </>
   );
 }

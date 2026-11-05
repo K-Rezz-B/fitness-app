@@ -73,3 +73,125 @@ body {
 input[type="range"] {
   accent-color: var(--color-accent);
 }
+
+/* ---------- Animations ---------- */
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+}
+@keyframes pop {
+  0% {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+  60% {
+    opacity: 1;
+    transform: scale(1.08);
+  }
+}
+@keyframes grow-x {
+  from {
+    transform: scaleX(0);
+  }
+}
+@keyframes grow-y {
+  from {
+    transform: scaleY(0);
+  }
+}
+@keyframes ring-fill {
+  from {
+    stroke-dashoffset: var(--ring-c);
+  }
+}
+@keyframes shine {
+  from {
+    background-position: -200% 0;
+  }
+  to {
+    background-position: 200% 0;
+  }
+}
+@keyframes pulse-soft {
+  50% {
+    transform: scale(1.04);
+  }
+}
+
+/* Cartes de page qui apparaissent en cascade (enfants directs du conteneur de page).
+   fill-mode « backwards » et pas « both » : une animation de transform qui reste active
+   ferait de la carte le repère des éléments position: fixed qu'elle contient (minuteur, modale). */
+.stagger > * {
+  animation: fade-up 0.45s cubic-bezier(0.2, 0.8, 0.2, 1) backwards;
+}
+.stagger > *:nth-child(2) { animation-delay: 40ms; }
+.stagger > *:nth-child(3) { animation-delay: 80ms; }
+.stagger > *:nth-child(4) { animation-delay: 120ms; }
+.stagger > *:nth-child(5) { animation-delay: 160ms; }
+.stagger > *:nth-child(6) { animation-delay: 200ms; }
+.stagger > *:nth-child(7) { animation-delay: 240ms; }
+.stagger > *:nth-child(n + 8) { animation-delay: 280ms; }
+
+@utility animate-pop {
+  animation: pop 0.5s cubic-bezier(0.2, 0.8, 0.2, 1) backwards;
+}
+@utility animate-fade-up {
+  animation: fade-up 0.4s cubic-bezier(0.2, 0.8, 0.2, 1) backwards;
+}
+@utility animate-grow-x {
+  transform-origin: left;
+  animation: grow-x 0.9s cubic-bezier(0.2, 0.8, 0.2, 1) backwards;
+}
+@utility animate-grow-y {
+  transform-origin: bottom;
+  animation: grow-y 0.7s cubic-bezier(0.2, 0.8, 0.2, 1) backwards;
+}
+/* Anneau SVG : stroke-dasharray = --ring-c, stroke-dashoffset = valeur finale */
+@utility animate-ring {
+  animation: ring-fill 1.1s cubic-bezier(0.2, 0.8, 0.2, 1) backwards;
+}
+@utility animate-pulse-soft {
+  animation: pulse-soft 1.6s ease-in-out infinite;
+}
+@utility text-shine {
+  background: linear-gradient(90deg, var(--color-accent) 20%, #fff 50%, var(--color-accent) 80%) 0 0 / 200% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: shine 2.4s linear infinite;
+}
+
+/* Transition entre les pages (React <ViewTransition>) : fondu rapide + léger glissement */
+::view-transition-old(.page) {
+  animation: 120ms ease-out both vt-out;
+}
+::view-transition-new(.page) {
+  animation: 220ms cubic-bezier(0.2, 0.8, 0.2, 1) 60ms both vt-in;
+}
+@keyframes vt-out {
+  to {
+    opacity: 0;
+  }
+}
+@keyframes vt-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after,
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) {
+    animation-duration: 0.01ms !important;
+    animation-delay: 0ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
