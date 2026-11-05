@@ -3,7 +3,9 @@ import { drizzle } from "drizzle-orm/postgres-js";
 import { migrate } from "drizzle-orm/postgres-js/migrator";
 import postgres from "postgres";
 
-const url = process.env.DATABASE_URL ?? process.env.POSTGRES_URL;
+// Connexion directe (sans PgBouncer) recommandée par Neon pour les migrations
+const url =
+  process.env.DATABASE_URL_UNPOOLED ?? process.env.POSTGRES_URL_NON_POOLING ?? process.env.DATABASE_URL ?? process.env.POSTGRES_URL;
 if (!url) {
   console.warn("[migrate] DATABASE_URL absent → migrations ignorées");
   process.exit(0);
