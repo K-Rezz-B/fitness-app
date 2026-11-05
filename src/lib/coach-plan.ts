@@ -4,7 +4,7 @@ import { db } from "./db";
 import { plans, profile, type Plan, type Profile, type Workout } from "./schema";
 import { getPlans, getWorkouts } from "./data";
 import { computeStats } from "./stats";
-import { planWeek, prescribe, recentMaxLoads, PHASES, type Equipment, type Goal, type Level, type PlannerPrefs, type Prescription, type WeekPlan } from "./planner";
+import { planWeek, prescribe, recentMaxLoads, templatesFor, PHASES, type Equipment, type Goal, type Level, type PlannerPrefs, type Prescription, type WeekPlan } from "./planner";
 import { templateById } from "./templates";
 import { typeInfo, WEEKDAYS } from "./constants";
 import { addDays, dayKey, diffDays, today } from "./dates";
@@ -19,6 +19,30 @@ export const prefsOf = (p: Profile): PlannerPrefs => ({
 });
 
 export const hasPlannerPrefs = (p: Profile) => p.planDays.length > 0;
+
+/**
+ * Programmes faisables par le profil. Sans questionnaire rempli, on ne connaît pas son matériel :
+ * on reste sur ce qui se fait partout (poids du corps, course, marche, mobilité).
+ */
+export function templatesForProfile(p: Profile) {
+  const known = hasPlannerPrefs(p);
+  const list = known
+    ? templatesFor({ equipment: p.planEquipment as Equipment, sports: p.planSports, level: p.planLevel as Level })
+    : templatesFor({ equipment: "bodyweight", sports: [], level: "intermediate" });
+  return { list, known };
+}
+
+/** Prochain créneau actif (aujourd'hui après l'heure `hhmm`, puis les jours suivants). */
+export function upcomingPlan<T extends Pick<Plan, "weekday" | "time" | "active">>(list: T[], weekday: number, hhmm: string) {
+  return list
+    .filter((x) => x.active)
+    .map((x) => {
+      let inDays = (x.weekday - weekday + 7) % 7;
+      if (inDays === 0 && x.time <= hhmm) inDays = 7;
+      return { plan: x, inDays };
+    })
+    .sort((a, b) => a.inDays - b.inDays || a.plan.time.localeCompare(b.plan.time))[0];
+}
 
 /** Index de la semaine dans le cycle (0-3 = mise en route, progression, pic, décharge). */
 export const phaseOf = (p: Profile, ws: string | null) =>

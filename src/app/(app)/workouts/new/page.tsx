@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { getPlan, getWeights, getVideos, getWorkouts } from "@/lib/data";
-import { prescriptionFor } from "@/lib/coach-plan";
+import { prescriptionFor, templatesForProfile } from "@/lib/coach-plan";
 import { prescriptionToExercises } from "@/lib/planner";
 import { requireProfile } from "@/lib/session";
 import { templateById, templateToExercises } from "@/lib/templates";
@@ -33,7 +33,7 @@ export default async function NewWorkout({ searchParams }: PageProps<"/workouts/
   return (
     <>
       <PageHeader title="Nouvelle séance" subtitle={plan ? `🧠 Prévue par ton coach · ${plan.notes ?? ""}` : "Chaque séance loggée = XP + score 📈"} />
-      {!plan && <TemplatePicker current={tpl?.id} />}
+      {!plan && <TemplatePicker current={tpl?.id} doable={templatesForProfile(me).list} showAll={one(sp.all) === "1"} />}
       <WorkoutForm key={plan ? `plan-${plan.id}` : (tpl?.id ?? type ?? "blank")} initial={initial} videos={videos.map((v) => ({ id: v.id, title: v.title }))} weightKg={ws[0]?.weightKg} />
     </>
   );

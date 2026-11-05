@@ -2,6 +2,7 @@ import "server-only";
 import { getActivity, getPlans, getWorkouts } from "./data";
 import { computeStats } from "./stats";
 import { remainingThisWeek } from "./notifications";
+import { upcomingPlan } from "./coach-plan";
 import { TZ, WEEKDAYS, typeInfo } from "./constants";
 import { dayKey, isoWeekday, today } from "./dates";
 import type { Profile } from "./schema";
@@ -25,13 +26,8 @@ export async function buildSummary(p: Profile, origin: string) {
     .map((x) => ({ time: x.time, title: x.title, emoji: typeInfo(x.type).emoji, done: doneToday.some((w) => sameCat(w.type, x.type)) }));
 
   // Prochain créneau à venir (dans les 7 jours, aujourd'hui après l'heure actuelle inclus)
-  const upcoming = active
-    .map((x) => {
-      let inDays = (x.weekday - wd + 7) % 7;
-      if (inDays === 0 && x.time <= hhmm) inDays = 7;
-      return { x, inDays };
-    })
-    .sort((a, b) => a.inDays - b.inDays || a.x.time.localeCompare(b.x.time))[0];
+  const next = upcomingPlan(active, wd, hhmm);
+  const upcoming = next ? { x: next.plan, inDays: next.inDays } : undefined;
 
   const last = all[0];
   return {
