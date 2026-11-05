@@ -37,6 +37,25 @@ export async function isValidSession(token: string | undefined): Promise<boolean
   return safeEqual(token, await sessionToken());
 }
 
+/**
+ * Jeton du flux calendrier d'un profil, dérivé de CALENDAR_TOKEN.
+ * Le profil 1 garde le jeton brut : les abonnements créés avant le multi-profils continuent de marcher.
+ */
+export async function calendarToken(profileId: number): Promise<string | null> {
+  const base = process.env.CALENDAR_TOKEN;
+  if (!base || base.length < 16) return null;
+  if (profileId === 1) return base;
+  return `${profileId}-${(await hmac(base, `calendar:${profileId}`)).slice(0, 32)}`;
+}
+
+/** Profil correspondant à un jeton de flux calendrier, ou null si le jeton est invalide. */
+export async function profileIdFromCalendarToken(token: string): Promise<number | null> {
+  const m = /^(\d{1,9})-[0-9a-f]{32}$/.exec(token);
+  const id = m ? Number(m[1]) : 1;
+  const expected = await calendarToken(id);
+  return expected && safeEqual(token, expected) ? id : null;
+}
+
 export async function checkPassword(input: string): Promise<boolean> {
   const expected = process.env.APP_PASSWORD;
   if (!expected) return false;

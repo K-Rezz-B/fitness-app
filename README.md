@@ -7,7 +7,7 @@ App web installable (iPhone + Mac) : suivi de séances, planning avec rappels Ap
 - Next.js 16 (App Router, Server Actions) · TypeScript · Tailwind v4
 - Postgres (Neon via Vercel Marketplace) · Drizzle ORM
 - Recharts · lucide-react
-- Auth mono-utilisateur : mot de passe + cookie signé HMAC (proxy Next)
+- Auth : mot de passe commun + cookie signé HMAC (proxy Next), puis choix du profil (cookie `fit_profile` par appareil)
 
 ## Déploiement Vercel (≈ 5 min)
 
@@ -31,9 +31,18 @@ App web installable (iPhone + Mac) : suivi de séances, planning avec rappels Ap
 
 Connexion valable 1 an par appareil.
 
+## Profils
+
+Un seul mot de passe pour l'app, **plusieurs profils** (toi, ton/ta partenaire…) : chacun a ses séances, pesées, planning, vidéos, score et coach.
+
+- Après connexion, l'écran **« Qui s'entraîne ? »** (`/profiles`) s'affiche s'il y a plusieurs profils ; avec un seul profil, il est choisi d'office.
+- Le profil choisi est mémorisé sur l'appareil (1 an). Changer : barre latérale (Mac) ou page **Profil › Changer de profil** (iPhone).
+- Supprimer un profil (page Profil, tout en bas) supprime toutes ses données, sans toucher aux autres.
+- Les données d'avant le multi-profils sont rattachées au profil n° 1 par la migration.
+
 ## Rappels de séances (Calendrier Apple)
 
-Page **Planning** › *S'abonner* (lien `webcal://`) :
+Page **Planning** › *S'abonner* (lien `webcal://`, **propre à chaque profil** — le profil n° 1 garde l'ancien lien, les abonnements existants continuent de marcher) :
 
 - **Mac** : Calendrier › Fichier › Nouvel abonnement › emplacement **iCloud** (→ synchro iPhone/Watch) › **décocher « Supprimer : Alertes »** › actualisation toutes les heures.
 - 2 alertes par séance : X min avant + à l'heure.

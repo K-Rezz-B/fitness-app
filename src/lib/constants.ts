@@ -58,3 +58,6 @@ export const GOALS = {
 } as const;
 
 export const TZ = process.env.APP_TIMEZONE ?? "Europe/Paris";
+
+/** Avatars proposés pour les profils */
+export const PROFILE_EMOJIS = ["💪", "🏃", "🚴", "🏊", "🧘", "🥊", "⚽", "🎾", "🔥", "⚡", "🦁", "🐺"];

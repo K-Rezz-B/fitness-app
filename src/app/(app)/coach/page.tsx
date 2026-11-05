@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { AlertTriangle, CheckCircle2, Info } from "lucide-react";
-import { getProfile, getWeights, getWorkouts } from "@/lib/data";
+import { getWeights, getWorkouts } from "@/lib/data";
+import { requireProfile } from "@/lib/session";
 import { computeStats } from "@/lib/stats";
 import { coach, movingAverage, SOURCES } from "@/lib/coach";
 import { GOALS } from "@/lib/constants";
@@ -19,8 +20,9 @@ const ICON = {
 const LEVEL_LABEL = { good: "Top", info: "Conseil", warning: "Attention" };
 
 export default async function Coach() {
-  const [p, ws, all] = await Promise.all([getProfile(), getWeights(), getWorkouts()]);
-  const stats = computeStats(all, p?.weeklySessionsTarget ?? 3);
+  const p = await requireProfile();
+  const [ws, all] = await Promise.all([getWeights(p.id), getWorkouts(p.id)]);
+  const stats = computeStats(all, p.weeklySessionsTarget);
   const c = coach(p, ws, stats);
   const chart = movingAverage(ws.filter((w) => w.date >= addDays(today(), -120))).map((d) => ({ ...d, label: fmtDate(d.date) }));
 
@@ -37,7 +39,7 @@ export default async function Coach() {
 
   return (
     <>
-      <PageHeader title="Coach" subtitle={`Objectif : ${GOALS[p!.goal as keyof typeof GOALS] ?? p!.goal}`} action={<Link href="/profile" className="btn-ghost hidden md:inline-flex">Profil & pesées</Link>} />
+      <PageHeader title="Coach" subtitle={`Objectif : ${GOALS[p.goal as keyof typeof GOALS] ?? p.goal}`} action={<Link href="/profile" className="btn-ghost hidden md:inline-flex">Profil & pesées</Link>} />
 
       <section className="mb-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
         <Stat label="Poids" value={c.kg.toFixed(1)} unit="kg" sub={c.weeklyRate !== null ? `${c.weeklyRate > 0 ? "+" : ""}${c.weeklyRate.toFixed(2)} kg/sem` : "Tendance : 2 sem. de données"} />

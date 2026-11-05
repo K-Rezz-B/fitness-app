@@ -3,13 +3,13 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
-import { eq, sql } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { plans, profile, videos, weights, workouts, type Exercise } from "@/lib/schema";
 import { SESSION_COOKIE, checkPassword, sessionToken } from "@/lib/auth";
-import { requireAuth } from "@/lib/session";
+import { PROFILE_COOKIE, requireAuth, requireProfile } from "@/lib/session";
 import { detectPlatform } from "@/lib/video";
-import { TYPE_BY_ID } from "@/lib/constants";
+import { PROFILE_EMOJIS, TYPE_BY_ID } from "@/lib/constants";
 
 // ---------- helpers ----------
 const str = (f: FormData, k: string) => String(f.get(k) ?? "").trim();
@@ -27,6 +27,15 @@ const idOf = (f: FormData) => {
 function revalidateAll() {
   revalidatePath("/", "layout");
 }
+const COOKIE_OPTS = {
+  httpOnly: true,
+  secure: process.env.NODE_ENV === "production",
+  sameSite: "lax",
+  path: "/",
+  maxAge: 60 * 60 * 24 * 365,
+} as const;
+/** id du profil actif (redirige vers le sélecteur s'il n'y en a pas) */
+const currentPid = async () => (await requireProfile()).id;
 
 // ---------- auth ----------
 export async function login(_prev: string | null, f: FormData): Promise<string | null> {
@@ -36,24 +45,52 @@ export async function login(_prev: string | null, f: FormData): Promise<string |
     await new Promise((r) => setTimeout(r, 600)); // ralentit le brute-force
     return "Mot de passe incorrect";
   }
-  (await cookies()).set(SESSION_COOKIE, await sessionToken(), {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
-    path: "/",
-    maxAge: 60 * 60 * 24 * 365,
-  });
+  (await cookies()).set(SESSION_COOKIE, await sessionToken(), COOKIE_OPTS);
   redirect("/");
 }
 
 export async function logout() {
-  (await cookies()).delete(SESSION_COOKIE);
+  const store = await cookies();
+  store.delete(SESSION_COOKIE);
+  store.delete(PROFILE_COOKIE);
   redirect("/login");
+}
+
+// ---------- profils ----------
+const emojiOf = (f: FormData) => (PROFILE_EMOJIS.includes(str(f, "emoji")) ? str(f, "emoji") : PROFILE_EMOJIS[0]);
+
+export async function selectProfile(f: FormData) {
+  await requireAuth();
+  const id = idOf(f);
+  const [p] = id ? await db.select({ id: profile.id }).from(profile).where(eq(profile.id, id)) : [];
+  if (!p) redirect("/profiles");
+  (await cookies()).set(PROFILE_COOKIE, String(p.id), COOKIE_OPTS);
+  revalidateAll();
+  redirect("/");
+}
+
+export async function createProfile(f: FormData) {
+  await requireAuth();
+  const name = str(f, "name").slice(0, 60);
+  if (!name) throw new Error("Prénom requis");
+  const [p] = await db.insert(profile).values({ name, emoji: emojiOf(f) }).returning({ id: profile.id });
+  (await cookies()).set(PROFILE_COOKIE, String(p.id), COOKIE_OPTS);
+  revalidateAll();
+  redirect("/profile?welcome=1");
+}
+
+export async function deleteProfile(f: FormData) {
+  const me = await requireProfile();
+  if (f.get("confirm") !== "on") throw new Error("Confirmation requise");
+  await db.delete(profile).where(eq(profile.id, me.id)); // cascade : séances, pesées, planning, vidéos
+  (await cookies()).delete(PROFILE_COOKIE);
+  revalidateAll();
+  redirect("/profiles");
 }
 
 // ---------- séances ----------
 export async function saveWorkout(f: FormData) {
-  await requireAuth();
+  const pid = await currentPid();
   const type = str(f, "type");
   if (!TYPE_BY_ID[type]) throw new Error("Type inconnu");
   let exercises: Exercise[] = [];
@@ -81,27 +118,37 @@ export async function saveWorkout(f: FormData) {
     distanceKm: num(f, "distanceKm"),
     calories: num(f, "calories") !== null ? Math.round(num(f, "calories")!) : null,
     notes: str(f, "notes").slice(0, 2000) || null,
-    videoId: num(f, "videoId"),
+    videoId: await ownVideoId(pid, num(f, "videoId")),
     exercises,
   };
   const id = idOf(f);
-  if (id) await db.update(workouts).set(values).where(eq(workouts.id, id));
-  else await db.insert(workouts).values(values);
+  if (id) await db.update(workouts).set(values).where(and(eq(workouts.id, id), eq(workouts.profileId, pid)));
+  else await db.insert(workouts).values({ ...values, profileId: pid });
   revalidateAll();
   redirect(id ? "/workouts" : "/?saved=1");
 }
 
+/** N'accepte qu'une vidéo du profil (évite de lier/afficher la vidéo d'un autre profil). */
+async function ownVideoId(pid: number, videoId: number | null) {
+  if (!videoId || !Number.isInteger(videoId)) return null;
+  const [v] = await db
+    .select({ id: videos.id })
+    .from(videos)
+    .where(and(eq(videos.id, videoId), eq(videos.profileId, pid)));
+  return v?.id ?? null;
+}
+
 export async function deleteWorkout(f: FormData) {
-  await requireAuth();
+  const pid = await currentPid();
   const id = idOf(f);
-  if (id) await db.delete(workouts).where(eq(workouts.id, id));
+  if (id) await db.delete(workouts).where(and(eq(workouts.id, id), eq(workouts.profileId, pid)));
   revalidateAll();
   redirect("/workouts");
 }
 
 // ---------- planning ----------
 export async function savePlan(f: FormData) {
-  await requireAuth();
+  const pid = await currentPid();
   const type = str(f, "type");
   const time = str(f, "time");
   if (!TYPE_BY_ID[type] || !/^\d{2}:\d{2}$/.test(time)) throw new Error("Données invalides");
@@ -115,28 +162,32 @@ export async function savePlan(f: FormData) {
     updatedAt: new Date(),
   };
   const id = idOf(f);
-  if (id) await db.update(plans).set(values).where(eq(plans.id, id));
-  else await db.insert(plans).values(values);
+  if (id) await db.update(plans).set(values).where(and(eq(plans.id, id), eq(plans.profileId, pid)));
+  else await db.insert(plans).values({ ...values, profileId: pid });
   revalidateAll();
 }
 
 export async function togglePlan(f: FormData) {
-  await requireAuth();
+  const pid = await currentPid();
   const id = idOf(f);
-  if (id) await db.update(plans).set({ active: sql`not ${plans.active}`, updatedAt: new Date() }).where(eq(plans.id, id));
+  if (id)
+    await db
+      .update(plans)
+      .set({ active: sql`not ${plans.active}`, updatedAt: new Date() })
+      .where(and(eq(plans.id, id), eq(plans.profileId, pid)));
   revalidateAll();
 }
 
 export async function deletePlan(f: FormData) {
-  await requireAuth();
+  const pid = await currentPid();
   const id = idOf(f);
-  if (id) await db.delete(plans).where(eq(plans.id, id));
+  if (id) await db.delete(plans).where(and(eq(plans.id, id), eq(plans.profileId, pid)));
   revalidateAll();
 }
 
 // ---------- vidéos ----------
 export async function saveVideo(f: FormData) {
-  await requireAuth();
+  const pid = await currentPid();
   const url = str(f, "url");
   try {
     const u = new URL(url);
@@ -163,31 +214,36 @@ export async function saveVideo(f: FormData) {
     notes: str(f, "notes").slice(0, 1000) || null,
   };
   const id = idOf(f);
-  if (id) await db.update(videos).set(values).where(eq(videos.id, id));
-  else await db.insert(videos).values(values);
+  if (id) await db.update(videos).set(values).where(and(eq(videos.id, id), eq(videos.profileId, pid)));
+  else await db.insert(videos).values({ ...values, profileId: pid });
   revalidateAll();
 }
 
 export async function toggleFavorite(f: FormData) {
-  await requireAuth();
+  const pid = await currentPid();
   const id = idOf(f);
-  if (id) await db.update(videos).set({ favorite: sql`not ${videos.favorite}` }).where(eq(videos.id, id));
+  if (id)
+    await db
+      .update(videos)
+      .set({ favorite: sql`not ${videos.favorite}` })
+      .where(and(eq(videos.id, id), eq(videos.profileId, pid)));
   revalidateAll();
 }
 
 export async function deleteVideo(f: FormData) {
-  await requireAuth();
+  const pid = await currentPid();
   const id = idOf(f);
-  if (id) await db.delete(videos).where(eq(videos.id, id));
+  if (id) await db.delete(videos).where(and(eq(videos.id, id), eq(videos.profileId, pid)));
   revalidateAll();
 }
 
 // ---------- profil & poids ----------
 export async function saveProfile(f: FormData) {
-  await requireAuth();
+  const pid = await currentPid();
   const birth = str(f, "birthDate");
   const values = {
-    name: str(f, "name").slice(0, 60),
+    name: str(f, "name").slice(0, 60) || "Moi",
+    emoji: emojiOf(f),
     sex: str(f, "sex") === "female" ? "female" : "male",
     birthDate: /^\d{4}-\d{2}-\d{2}$/.test(birth) ? birth : null,
     heightCm: num(f, "heightCm"),
@@ -197,23 +253,23 @@ export async function saveProfile(f: FormData) {
     weeklySessionsTarget: clamp(Math.round(num(f, "weeklySessionsTarget") ?? 3), 1, 14),
     updatedAt: new Date(),
   };
-  await db.insert(profile).values({ id: 1, ...values }).onConflictDoUpdate({ target: profile.id, set: values });
+  await db.update(profile).set(values).where(eq(profile.id, pid));
   revalidateAll();
 }
 
 export async function addWeight(f: FormData) {
-  await requireAuth();
+  const pid = await currentPid();
   const kg = num(f, "weightKg");
   const date = str(f, "date");
   if (!kg || kg < 20 || kg > 400 || !/^\d{4}-\d{2}-\d{2}$/.test(date)) throw new Error("Poids invalide");
   const bf = num(f, "bodyFatPct");
-  await db.insert(weights).values({ date, weightKg: kg, bodyFatPct: bf && bf > 0 && bf < 70 ? bf : null });
+  await db.insert(weights).values({ profileId: pid, date, weightKg: kg, bodyFatPct: bf && bf > 0 && bf < 70 ? bf : null });
   revalidateAll();
 }
 
 export async function deleteWeight(f: FormData) {
-  await requireAuth();
+  const pid = await currentPid();
   const id = idOf(f);
-  if (id) await db.delete(weights).where(eq(weights.id, id));
+  if (id) await db.delete(weights).where(and(eq(weights.id, id), eq(weights.profileId, pid)));
   revalidateAll();
 }

@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import { headers } from "next/headers";
 import { BellRing, CalendarPlus, Download, Pencil, Trash2 } from "lucide-react";
 import { getPlans, getWorkouts } from "@/lib/data";
+import { requireProfile } from "@/lib/session";
+import { calendarToken } from "@/lib/auth";
 import { WEEKDAYS, WORKOUT_TYPES, typeInfo, CATEGORIES } from "@/lib/constants";
 import { addDays, dayKey, today, weekStart } from "@/lib/dates";
 import { deletePlan, savePlan, togglePlan } from "@/app/actions";
@@ -52,9 +54,9 @@ function PlanFields({ p }: { p?: Plan }) {
 }
 
 export default async function Planning() {
-  const [plans, workouts, h] = await Promise.all([getPlans(), getWorkouts(), headers()]);
+  const me = await requireProfile();
+  const [plans, workouts, h, token] = await Promise.all([getPlans(me.id), getWorkouts(me.id), headers(), calendarToken(me.id)]);
   const host = h.get("x-forwarded-host") ?? h.get("host") ?? "localhost:3000";
-  const token = process.env.CALENDAR_TOKEN;
   const feed = token ? `webcal://${host}/api/calendar/${token}.ics` : null;
 
   const t = today();
@@ -113,7 +115,7 @@ export default async function Planning() {
         {feed ? (
           <>
             <p className="mb-3 text-sm text-ink-2">
-              Abonne-toi une fois : tes séances apparaissent sur iPhone, Mac et Apple Watch avec 2 alertes (avant + à l&apos;heure). Toute modif ici se met à jour toute seule.
+              Abonne-toi une fois (lien propre au profil <b>{me.name}</b>) : tes séances apparaissent sur iPhone, Mac et Apple Watch avec 2 alertes (avant + à l&apos;heure). Toute modif ici se met à jour toute seule.
             </p>
             <div className="flex flex-wrap gap-2">
               <a href={feed} className="btn-primary"><CalendarPlus size={16} /> S&apos;abonner</a>
