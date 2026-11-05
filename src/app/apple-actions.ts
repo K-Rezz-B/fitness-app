@@ -17,7 +17,8 @@ import { isoBase64URL } from "@simplewebauthn/server/helpers";
 import { db } from "@/lib/db";
 import { passkeys, profile, pushSubscriptions } from "@/lib/schema";
 import { SESSION_COOKIE, sessionToken, signValue, verifySigned } from "@/lib/auth";
-import { COOKIE_OPTS, PROFILE_COOKIE, requireProfile } from "@/lib/session";
+import { COOKIE_OPTS, requireAuth, requireProfile, setUnlockedProfile } from "@/lib/session";
+import { resetPinAttempts } from "@/lib/pin";
 import { newApiToken } from "@/lib/api-auth";
 import { pushConfigured, sendToProfile } from "@/lib/push";
 import { getWorkouts } from "@/lib/data";
@@ -153,23 +154,27 @@ export async function deletePasskey(f: FormData) {
   refresh();
 }
 
-/** Connexion sans mot de passe (page /login, hors session) */
-export async function passkeyLoginOptions() {
+/** Challenge signé en cookie (5 min) lié à l'usage (`auth` = /login, `unlock:<id>` = déverrouillage d'un profil). */
+async function authenticationOptions(purpose: string, allow?: { id: string; transports: string[] }[]) {
   const rp = await relyingParty();
-  const options = await generateAuthenticationOptions({ rpID: rp.rpID, userVerification: "required" });
-  (await cookies()).set(WEBAUTHN_COOKIE, await signValue("auth", options.challenge, CHALLENGE_TTL_MS), challengeCookie);
+  const options = await generateAuthenticationOptions({
+    rpID: rp.rpID,
+    userVerification: "required",
+    allowCredentials: allow,
+  });
+  (await cookies()).set(WEBAUTHN_COOKIE, await signValue(purpose, options.challenge, CHALLENGE_TTL_MS), challengeCookie);
   return options;
 }
 
-export async function verifyPasskeyLogin(response: AuthenticationResponseJSON): Promise<string | null> {
-  if (!process.env.APP_PASSWORD || !process.env.AUTH_SECRET) return "Configure APP_PASSWORD et AUTH_SECRET dans Vercel.";
+/** Vérifie une assertion Face ID / Touch ID : renvoie le profil propriétaire de la passkey, ou une erreur. */
+async function verifyAssertion(purpose: string, response: AuthenticationResponseJSON): Promise<{ profileId: number } | { error: string }> {
   const rp = await relyingParty();
   const store = await cookies();
-  const challenge = await verifySigned("auth", store.get(WEBAUTHN_COOKIE)?.value);
+  const challenge = await verifySigned(purpose, store.get(WEBAUTHN_COOKIE)?.value);
   store.delete(WEBAUTHN_COOKIE);
-  if (!challenge) return "Délai dépassé, réessaie.";
+  if (!challenge) return { error: "Délai dépassé, réessaie." };
   const [k] = await db.select().from(passkeys).where(eq(passkeys.id, String(response?.id ?? "")));
-  if (!k) return "Passkey inconnue (supprimée ?) : connecte-toi avec le mot de passe.";
+  if (!k) return { error: "Passkey inconnue (supprimée ?)." };
   try {
     const v = await verifyAuthenticationResponse({
       response,
@@ -179,13 +184,52 @@ export async function verifyPasskeyLogin(response: AuthenticationResponseJSON): 
       credential: { id: k.id, publicKey: isoBase64URL.toBuffer(k.publicKey), counter: k.counter, transports: k.transports },
       requireUserVerification: true,
     });
-    if (!v.verified) return "Vérification refusée.";
+    if (!v.verified) return { error: "Vérification refusée." };
     await db.update(passkeys).set({ counter: v.authenticationInfo.newCounter, lastUsedAt: new Date() }).where(eq(passkeys.id, k.id));
   } catch (e) {
-    return `Échec : ${(e as Error).message}`;
+    return { error: `Échec : ${(e as Error).message}` };
   }
-  // Session + profil de la personne à qui appartient la passkey
-  store.set(SESSION_COOKIE, await sessionToken(), COOKIE_OPTS);
-  store.set(PROFILE_COOKIE, String(k.profileId), COOKIE_OPTS);
+  return { profileId: k.profileId };
+}
+
+/** Face ID réussi : remet à zéro les essais de code et ouvre le profil sur cet appareil. */
+async function unlockAfterPasskey(profileId: number) {
+  const p = await resetPinAttempts(profileId);
+  if (p) await setUnlockedProfile(p);
+  revalidatePath("/", "layout");
+}
+
+/** Connexion sans mot de passe (page /login, hors session) : ouvre le profil de la passkey. */
+export async function passkeyLoginOptions() {
+  return authenticationOptions("auth");
+}
+
+export async function verifyPasskeyLogin(response: AuthenticationResponseJSON): Promise<string | null> {
+  if (!process.env.APP_PASSWORD || !process.env.AUTH_SECRET) return "Configure APP_PASSWORD et AUTH_SECRET dans Vercel.";
+  const r = await verifyAssertion("auth", response);
+  if ("error" in r) return `${r.error} Connecte-toi avec le mot de passe.`;
+  (await cookies()).set(SESSION_COOKIE, await sessionToken(), COOKIE_OPTS);
+  await unlockAfterPasskey(r.profileId);
+  redirect("/");
+}
+
+/** Sélecteur de profils : déverrouiller un profil précis avec une de ses passkeys. */
+export async function passkeyUnlockOptions(profileId: number) {
+  await requireAuth();
+  const id = Number(profileId);
+  const keys = Number.isInteger(id)
+    ? await db.select({ id: passkeys.id, transports: passkeys.transports }).from(passkeys).where(eq(passkeys.profileId, id))
+    : [];
+  if (!keys.length) throw new Error("Face ID n'est pas activé pour ce profil.");
+  return authenticationOptions(`unlock:${id}`, keys);
+}
+
+export async function verifyPasskeyUnlock(profileId: number, response: AuthenticationResponseJSON): Promise<string | null> {
+  await requireAuth();
+  const id = Number(profileId);
+  const r = await verifyAssertion(`unlock:${id}`, response);
+  if ("error" in r) return `${r.error} Utilise ton code.`;
+  if (r.profileId !== id) return "Cette passkey appartient à un autre profil.";
+  await unlockAfterPasskey(id);
   redirect("/");
 }

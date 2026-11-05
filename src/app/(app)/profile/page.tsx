@@ -1,19 +1,21 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Apple, ArrowLeftRight, ChevronRight, Trash2 } from "lucide-react";
-import { getWeights } from "@/lib/data";
+import { Apple, ArrowLeftRight, ChevronRight, Lock, ScanFace, Trash2 } from "lucide-react";
+import { getPasskeys, getWeights } from "@/lib/data";
 import { requireProfile } from "@/lib/session";
 import { ACTIVITY_LEVELS, GOALS } from "@/lib/constants";
 import { fmtDate, today } from "@/lib/dates";
-import { addWeight, deleteProfile, deleteWeight, logout, saveProfile } from "@/app/actions";
+import { addWeight, changePin, deleteProfile, deleteWeight, lockProfile, logout, saveProfile } from "@/app/actions";
 import { PageHeader } from "@/components/ui";
 import { EmojiPicker } from "@/components/emoji-picker";
+import { ActionForm, NewPinFields, PinInput } from "@/components/action-form";
+import { PasskeyRegisterButton } from "@/components/passkeys";
 
 export const metadata: Metadata = { title: "Profil" };
 
 export default async function Profile({ searchParams }: PageProps<"/profile">) {
   const p = await requireProfile();
-  const [ws, sp] = await Promise.all([getWeights(p.id), searchParams]);
+  const [ws, keys, sp] = await Promise.all([getWeights(p.id), getPasskeys(p.id), searchParams]);
   return (
     <>
       <PageHeader
@@ -28,7 +30,12 @@ export default async function Profile({ searchParams }: PageProps<"/profile">) {
 
       {sp.welcome && (
         <div className="mb-4 rounded-2xl border border-accent/30 bg-accent/10 px-4 py-3 text-sm text-accent">
-          🎉 Profil créé ! Complète tes infos et ta première pesée pour activer le coach.
+          🎉 Profil créé et protégé par ton code ! Complète tes infos et ta première pesée pour activer le coach.
+        </div>
+      )}
+      {sp.pin && (
+        <div className="mb-4 rounded-2xl border border-accent/30 bg-accent/10 px-4 py-3 text-sm text-accent">
+          🔒 Code enregistré : ton profil est maintenant verrouillé. Active Face ID plus bas pour l&apos;ouvrir sans le taper.
         </div>
       )}
       <div className="grid gap-4 lg:grid-cols-2">
@@ -127,20 +134,64 @@ export default async function Profile({ searchParams }: PageProps<"/profile">) {
         <ChevronRight size={16} className="text-muted" />
       </Link>
 
+      <section className="card mt-4">
+        <div className="mb-1 flex items-center gap-2 font-semibold">
+          <Lock size={18} className="text-accent" /> Verrouillage du profil
+        </div>
+        <p className="text-sm text-ink-2">
+          Ton profil s&apos;ouvre avec ton code PIN{keys.length > 0 && " ou Face ID"}. Il reste ouvert sur cet appareil jusqu&apos;à ce que tu le
+          verrouilles ou que quelqu&apos;un d&apos;autre ouvre son profil.
+        </p>
+        <div className="mt-4 grid gap-4 sm:grid-cols-2">
+          <div className="space-y-3">
+            <div className="flex items-center gap-2 text-sm font-semibold">
+              <ScanFace size={16} className="text-force" /> Face ID / Touch ID
+            </div>
+            {keys.length > 0 ? (
+              <p className="text-sm text-muted">
+                Activé sur {keys.length} appareil{keys.length > 1 ? "s" : ""} ·{" "}
+                <Link href="/integrations" className="underline">gérer</Link>
+              </p>
+            ) : (
+              <p className="text-sm text-muted">Pas encore activé : déverrouille ton profil d&apos;un regard.</p>
+            )}
+            <PasskeyRegisterButton />
+          </div>
+          <details className="rounded-2xl border border-line p-4">
+            <summary className="cursor-pointer text-sm font-semibold">Changer de code PIN</summary>
+            <ActionForm action={changePin} submit="Changer le code" pendingLabel="Vérification…" className="mt-3">
+              <PinInput name="currentPin" label="Code actuel" />
+              <NewPinFields label="Nouveau code" />
+            </ActionForm>
+          </details>
+        </div>
+        <form action={lockProfile} className="mt-4">
+          <button className="btn-ghost w-full sm:w-auto">
+            <Lock size={16} /> Verrouiller maintenant
+          </button>
+        </form>
+      </section>
+
       <details className="card mt-4">
         <summary className="cursor-pointer text-sm font-semibold text-critical">Supprimer le profil « {p.name} »</summary>
-        <form action={deleteProfile} className="mt-3 space-y-3">
+        <ActionForm
+          action={deleteProfile}
+          danger
+          submit={<><Trash2 size={16} /> Supprimer définitivement</>}
+          pendingLabel="Suppression…"
+          className="mt-3 space-y-3"
+        >
           <p className="text-sm text-ink-2">
             Supprime définitivement ce profil et toutes ses données : séances, pesées, planning et vidéos. Les autres profils ne sont pas touchés.
           </p>
+          <div className="max-w-48">
+            <PinInput label="Ton code PIN" />
+          </div>
           <label className="flex items-center gap-2 text-sm">
             <input type="checkbox" name="confirm" required className="h-4 w-4 accent-[var(--color-critical)]" />
             Je confirme, c&apos;est irréversible
           </label>
-          <button className="btn-ghost text-critical">
-            <Trash2 size={16} /> Supprimer définitivement
-          </button>
-        </form>
+        </ActionForm>
       </details>
 
       <form action={logout} className="mt-6 text-center">

@@ -7,7 +7,7 @@ App web installable (iPhone + Mac) : suivi de séances, planning avec rappels Ap
 - Next.js 16 (App Router, Server Actions) · TypeScript · Tailwind v4
 - Postgres (Neon via Vercel Marketplace) · Drizzle ORM
 - Recharts · lucide-react
-- Auth : mot de passe commun + cookie signé HMAC (proxy Next), puis choix du profil (cookie `fit_profile` par appareil)
+- Auth : mot de passe commun + cookie signé HMAC (proxy Next), puis déverrouillage du profil par code PIN ou Face ID (cookie `fit_profile` signé, par appareil)
 
 ## Déploiement Vercel (≈ 5 min)
 
@@ -38,9 +38,14 @@ Connexion valable 1 an par appareil.
 
 Un seul mot de passe pour l'app, **plusieurs profils** (toi, ton/ta partenaire…) : chacun a ses séances, pesées, planning, vidéos, score et coach.
 
-- Après connexion, l'écran **« Qui s'entraîne ? »** (`/profiles`) s'affiche s'il y a plusieurs profils ; avec un seul profil, il est choisi d'office.
-- Le profil choisi est mémorisé sur l'appareil (1 an). Changer : barre latérale (Mac) ou page **Profil › Changer de profil** (iPhone).
-- Supprimer un profil (page Profil, tout en bas) supprime toutes ses données, sans toucher aux autres.
+- Après connexion, l'écran **« Qui s'entraîne ? »** (`/profiles`) s'affiche ; chaque profil est **verrouillé**.
+- **Code PIN** (4 à 6 chiffres) choisi à la création du profil, obligatoire. **Face ID / Touch ID** en alternative une fois activé (page Profil › Verrouillage, ou page Apple).
+- Un profil déverrouillé reste ouvert sur l'appareil (1 an) jusqu'à **Verrouiller maintenant** (page Profil ou sélecteur), l'ouverture d'un autre profil, ou la déconnexion. Changer : barre latérale (Mac) ou page **Profil › Changer de profil** (iPhone).
+- Le cookie de profil est signé avec l'empreinte du code : impossible de le forger pour ouvrir un autre profil, et **changer son code reverrouille ses autres appareils**.
+- 5 codes faux → blocage 15 min, doublé à chaque nouvel échec (24 h max) ; Face ID débloque. Le code est stocké haché (PBKDF2), jamais en clair.
+- Changer de code ou supprimer le profil exige le code actuel. Supprimer un profil supprime toutes ses données, sans toucher aux autres.
+- Profils créés avant le verrou : le code est demandé à leur prochaine ouverture (le premier qui l'ouvre le choisit — à faire vite).
+- Code oublié : `UPDATE profile SET pin_hash = NULL WHERE name = '…';` dans la console Neon → un nouveau code sera demandé à l'ouverture.
 - Les données d'avant le multi-profils sont rattachées au profil n° 1 par la migration.
 
 ## Intégrations Apple (page **Apple**)
@@ -49,7 +54,7 @@ Tout se configure depuis la page **Apple** de l'app (barre latérale, ou Profil 
 
 - **Apple Santé / Apple Watch via Raccourcis** : un jeton personnel + 2 automatisations « Exercice Apple Watch » (Commence / Se termine) envoient chaque séance à `POST /api/v1/workouts` ; une automatisation quotidienne envoie la dernière pesée à `POST /api/v1/weights`. Durée, type (noms Apple FR/EN reconnus), distance, calories (sinon estimées MET × poids), RPE estimé depuis la FC. Doublons ignorés.
 - **Notifications push + pastille d'icône** (iOS 16.4+, app ajoutée à l'écran d'accueil) : rappel du soir si la série est en danger ou si une séance prévue n'est pas faite, bilan du dimanche, nouveau badge. Cron Vercel `/api/cron/daily` à 17 h UTC (plan gratuit : 1 fois/jour). La pastille affiche les séances restantes de la semaine.
-- **Face ID / Touch ID** : passkeys (trousseau iCloud) → connexion sans mot de passe, directement sur le bon profil.
+- **Face ID / Touch ID** : passkeys (trousseau iCloud) → connexion sans mot de passe directement sur le bon profil, et déverrouillage du profil sans taper son code.
 - **Widget** écran d'accueil / verrouillé via l'app gratuite **Scriptable** (script généré avec ton jeton) : score, séances de la semaine, série, prochain créneau (`GET /api/v1/summary`).
 
 - **Activité du jour (app Forme)** : une automatisation quotidienne envoie pas, énergie active et distance à `POST /api/v1/activity` → anneaux « Bouger » et pas sur l'accueil, et le coach calcule ta dépense avec ton niveau d'activité **mesuré** (moyenne des pas sur 14 j) au lieu de celui déclaré.

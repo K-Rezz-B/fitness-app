@@ -17,7 +17,7 @@ import {
 export type ExerciseSet = { reps?: number; weight?: number };
 export type Exercise = { name: string; sets: ExerciseSet[] };
 
-/** Profils (un mot de passe commun, plusieurs personnes). Toutes les données sont rattachées à un profil. */
+/** Profils (un mot de passe commun, plusieurs personnes, chacun verrouillé par son code). Toutes les données sont rattachées à un profil. */
 export const profile = pgTable("profile", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
   name: text("name").notNull().default(""),
@@ -51,6 +51,11 @@ export const profile = pgTable("profile", {
   // --- Objectifs d'activité quotidienne (app Forme) ---
   moveGoalKcal: smallint("move_goal_kcal").notNull().default(400),
   stepsGoal: smallint("steps_goal").notNull().default(8000),
+  // --- Verrouillage du profil (code PIN, ou Face ID via une passkey) ---
+  /** Empreinte PBKDF2 du code (jamais en clair, ne jamais l'envoyer au navigateur). null = profil créé avant le verrou */
+  pinHash: text("pin_hash"),
+  pinFailedAttempts: smallint("pin_failed_attempts").notNull().default(0),
+  pinLockedUntil: timestamp("pin_locked_until", { withTimezone: true }),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
