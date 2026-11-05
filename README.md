@@ -21,6 +21,9 @@ App web installable (iPhone + Mac) : suivi de séances, planning avec rappels Ap
    | `AUTH_SECRET` | `openssl rand -hex 32` |
    | `CALENDAR_TOKEN` | `openssl rand -hex 16` |
    | `APP_TIMEZONE` | `Europe/Paris` (optionnel) |
+   | `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` | `npx web-push generate-vapid-keys` (notifications push) |
+   | `VAPID_SUBJECT` | `mailto:ton@email` (optionnel, défaut : URL de prod) |
+   | `CRON_SECRET` | `openssl rand -hex 16` (cron quotidien des notifications) |
 
 4. **Redéployer**. Les migrations SQL s'appliquent automatiquement au build (`scripts/migrate.mjs`).
 
@@ -38,6 +41,17 @@ Un seul mot de passe pour l'app, **plusieurs profils** (toi, ton/ta partenaire�
 - Après connexion, l'écran **« Qui s'entraîne ? »** (`/profiles`) s'affiche s'il y a plusieurs profils ; avec un seul profil, il est choisi d'office.
 - Le profil choisi est mémorisé sur l'appareil (1 an). Changer : barre latérale (Mac) ou page **Profil › Changer de profil** (iPhone).
 - Supprimer un profil (page Profil, tout en bas) supprime toutes ses données, sans toucher aux autres.
+
+## Intégrations Apple (page **Apple**)
+
+Tout se configure depuis la page **Apple** de l'app (barre latérale, ou Profil › Apple sur iPhone), par profil.
+
+- **Apple Santé / Apple Watch via Raccourcis** : un jeton personnel + 2 automatisations « Exercice Apple Watch » (Commence / Se termine) envoient chaque séance à `POST /api/v1/workouts` ; une automatisation quotidienne envoie la dernière pesée à `POST /api/v1/weights`. Durée, type (noms Apple FR/EN reconnus), distance, calories (sinon estimées MET × poids), RPE estimé depuis la FC. Doublons ignorés.
+- **Notifications push + pastille d'icône** (iOS 16.4+, app ajoutée à l'écran d'accueil) : rappel du soir si la série est en danger ou si une séance prévue n'est pas faite, bilan du dimanche, nouveau badge. Cron Vercel `/api/cron/daily` à 17 h UTC (plan gratuit : 1 fois/jour). La pastille affiche les séances restantes de la semaine.
+- **Face ID / Touch ID** : passkeys (trousseau iCloud) → connexion sans mot de passe, directement sur le bon profil.
+- **Widget** écran d'accueil / verrouillé via l'app gratuite **Scriptable** (script généré avec ton jeton) : score, séances de la semaine, série, prochain créneau (`GET /api/v1/summary`).
+
+Les API `/api/v1/*` s'authentifient par `Authorization: Bearer <jeton du profil>` (régénérable / désactivable).
 - Les données d'avant le multi-profils sont rattachées au profil n° 1 par la migration.
 
 ## Rappels de séances (Calendrier Apple)

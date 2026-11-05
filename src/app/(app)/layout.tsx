@@ -1,8 +1,11 @@
 import { Sidebar, TabBar, Fab } from "@/components/nav";
+import { AppBadge } from "@/components/app-badge";
 import { requireProfile } from "@/lib/session";
+import { countThisWeek } from "@/lib/data";
 
 export default async function AppLayout({ children }: LayoutProps<"/">) {
   const me = await requireProfile();
+  const remaining = Math.max(0, me.weeklySessionsTarget - (await countThisWeek(me.id)));
   return (
     <div className="flex min-h-dvh">
       <Sidebar profile={{ name: me.name, emoji: me.emoji }} />
@@ -11,6 +14,7 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
       </main>
       <Fab />
       <TabBar />
+      <AppBadge count={remaining} />
     </div>
   );
 }

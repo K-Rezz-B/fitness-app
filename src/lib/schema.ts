@@ -9,7 +9,9 @@ import {
   date,
   jsonb,
   smallint,
+  bigint,
   index,
+  uniqueIndex,
 } from "drizzle-orm/pg-core";
 
 export type ExerciseSet = { reps?: number; weight?: number };
@@ -27,6 +29,14 @@ export const profile = pgTable("profile", {
   goal: text("goal").notNull().default("maintain"), // lose | maintain | gain | performance
   targetWeightKg: real("target_weight_kg"),
   weeklySessionsTarget: smallint("weekly_sessions_target").notNull().default(3),
+  /** Jeton secret des intégrations (Raccourcis, widget) — null = désactivé */
+  apiToken: text("api_token").unique(),
+  notifyStreak: boolean("notify_streak").notNull().default(true),
+  notifyWeekly: boolean("notify_weekly").notNull().default(true),
+  notifyBadges: boolean("notify_badges").notNull().default(true),
+  /** Début d'exercice Apple Watch reçu, en attente du signal de fin */
+  pendingWorkoutStart: timestamp("pending_workout_start", { withTimezone: true }),
+  pendingWorkoutType: text("pending_workout_type"),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
@@ -58,8 +68,14 @@ export const workouts = pgTable("workouts", {
   exercises: jsonb("exercises").$type<Exercise[]>().notNull().default([]),
   notes: text("notes"),
   videoId: integer("video_id"),
+  source: text("source").notNull().default("manual"), // manual | apple-health
+  /** Clé de dédoublonnage des imports (même séance envoyée 2 fois) */
+  externalId: text("external_id"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-}, (t) => [index("workouts_profile_date_idx").on(t.profileId, t.date)]);
+}, (t) => [
+  index("workouts_profile_date_idx").on(t.profileId, t.date),
+  uniqueIndex("workouts_profile_external_idx").on(t.profileId, t.externalId),
+]);
 
 /** Séances planifiées récurrentes (hebdo) → exportées en flux .ics */
 export const plans = pgTable("plans", {
@@ -90,8 +106,33 @@ export const videos = pgTable("videos", {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 }, (t) => [index("videos_profile_idx").on(t.profileId)]);
 
+/** Abonnements Web Push (un par appareil / navigateur) */
+export const pushSubscriptions = pgTable("push_subscriptions", {
+  id: serial("id").primaryKey(),
+  profileId: profileId(),
+  endpoint: text("endpoint").notNull().unique(),
+  p256dh: text("p256dh").notNull(),
+  auth: text("auth").notNull(),
+  userAgent: text("user_agent"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [index("push_profile_idx").on(t.profileId)]);
+
+/** Passkeys (Face ID / Touch ID, synchronisées par le trousseau iCloud). Se connecter avec ouvre le profil associé. */
+export const passkeys = pgTable("passkeys", {
+  id: text("id").primaryKey(), // identifiant de la credential (base64url)
+  profileId: profileId(),
+  publicKey: text("public_key").notNull(), // clé publique COSE (base64url)
+  counter: bigint("counter", { mode: "number" }).notNull().default(0),
+  transports: text("transports").array().notNull().default([]),
+  deviceName: text("device_name").notNull().default(""),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  lastUsedAt: timestamp("last_used_at", { withTimezone: true }),
+}, (t) => [index("passkeys_profile_idx").on(t.profileId)]);
+
 export type Profile = typeof profile.$inferSelect;
 export type Weight = typeof weights.$inferSelect;
 export type Workout = typeof workouts.$inferSelect;
 export type Plan = typeof plans.$inferSelect;
 export type Video = typeof videos.$inferSelect;
+export type PushSubscriptionRow = typeof pushSubscriptions.$inferSelect;
+export type Passkey = typeof passkeys.$inferSelect;

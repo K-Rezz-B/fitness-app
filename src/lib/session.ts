@@ -9,6 +9,15 @@ import type { Profile } from "./schema";
 /** Profil actif de l'appareil. Pas besoin de le signer : tout utilisateur connecté peut changer de profil. */
 export const PROFILE_COOKIE = "fit_profile";
 
+/** Cookies de session / profil : 1 an, inaccessibles au JS */
+export const COOKIE_OPTS = {
+  httpOnly: true,
+  secure: process.env.NODE_ENV === "production",
+  sameSite: "lax",
+  path: "/",
+  maxAge: 60 * 60 * 24 * 365,
+} as const;
+
 /** Défense en profondeur (le proxy filtre déjà) + rend la page dynamique. */
 export async function requireAuth() {
   const store = await cookies();

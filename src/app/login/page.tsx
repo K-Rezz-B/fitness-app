@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { LoginForm } from "./form";
+import { PasskeyLoginButton } from "@/components/passkeys";
 
 export const metadata: Metadata = { title: "Connexion" };
 
@@ -13,6 +14,7 @@ export default function LoginPage() {
           <p className="mt-2 text-sm text-muted">Ton coach perso. Chaque séance compte.</p>
         </div>
         <LoginForm />
+        <PasskeyLoginButton />
       </div>
     </main>
   );

@@ -56,6 +56,18 @@ export async function profileIdFromCalendarToken(token: string): Promise<number 
   return expected && safeEqual(token, expected) ? id : null;
 }
 
+/** Valeur signée + expirante (ex. challenge WebAuthn en cookie) : `valeur.expiration.signature` */
+export async function signValue(purpose: string, value: string, ttlMs: number): Promise<string> {
+  const exp = Date.now() + ttlMs;
+  return `${value}.${exp}.${await hmac(secret(), `${purpose}:${value}:${exp}`)}`;
+}
+
+export async function verifySigned(purpose: string, signed: string | undefined): Promise<string | null> {
+  const m = signed ? /^([A-Za-z0-9_-]+)\.(\d+)\.([0-9a-f]{64})$/.exec(signed) : null;
+  if (!m || Number(m[2]) < Date.now()) return null;
+  return safeEqual(m[3], await hmac(secret(), `${purpose}:${m[1]}:${m[2]}`)) ? m[1] : null;
+}
+
 export async function checkPassword(input: string): Promise<boolean> {
   const expected = process.env.APP_PASSWORD;
   if (!expected) return false;
