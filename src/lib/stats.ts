@@ -7,6 +7,9 @@ export const load = (w: Pick<Workout, "durationMin" | "rpe">) => w.durationMin *
 export const whoMinutes = (w: Pick<Workout, "durationMin" | "rpe">) =>
   w.rpe >= 7 ? w.durationMin * 2 : w.durationMin;
 
+/** XP gagnée par séance : 50 + charge / 5 */
+export const workoutXp = (w: Pick<Workout, "durationMin" | "rpe">) => 50 + Math.round(load(w) / 5);
+
 export type Stats = ReturnType<typeof computeStats>;
 
 export function computeStats(all: Workout[], weeklyTarget: number) {
@@ -85,7 +88,7 @@ export function computeStats(all: Workout[], weeklyTarget: number) {
   const score = Math.round(scoreParts.reduce((s, p) => s + p.value * p.weight, 0));
 
   // --- XP & niveaux ---
-  const xp = all.reduce((s, w) => s + 50 + Math.round(load(w) / 5), 0);
+  const xp = all.reduce((s, w) => s + workoutXp(w), 0);
   const level = Math.floor(Math.sqrt(xp / 300)) + 1;
   const xpFor = (l: number) => 300 * (l - 1) ** 2;
   const levelProgress = (xp - xpFor(level)) / (xpFor(level + 1) - xpFor(level));

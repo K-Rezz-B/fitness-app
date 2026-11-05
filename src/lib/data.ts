@@ -1,6 +1,6 @@
 import "server-only";
 import { cache } from "react";
-import { and, asc, desc, eq, gte } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, lt } from "drizzle-orm";
 import { db } from "./db";
 import { dailyActivity, passkeys, plans, profile, pushSubscriptions, videos, weights, workouts } from "./schema";
 import { addDays, dayKey, today, weekStart } from "./dates";
@@ -41,3 +41,22 @@ export const getActivity = (pid: number, days = 30) =>
     .from(dailyActivity)
     .where(and(eq(dailyActivity.profileId, pid), gte(dailyActivity.date, addDays(today(), -(days - 1)))))
     .orderBy(desc(dailyActivity.date));
+
+/**
+ * Défis : profils qui ont choisi d'y participer et leurs séances sur [from, to[.
+ * Seule lecture qui traverse les profils : limitée aux volontaires et à des champs non sensibles.
+ */
+export async function getChallengeBoard(from: Date, to: Date) {
+  const people = await db
+    .select({ id: profile.id, name: profile.name, emoji: profile.emoji, target: profile.weeklySessionsTarget })
+    .from(profile)
+    .where(eq(profile.shareChallenges, true))
+    .orderBy(asc(profile.id));
+  const rows = people.length
+    ? await db
+        .select({ profileId: workouts.profileId, date: workouts.date, durationMin: workouts.durationMin, rpe: workouts.rpe, type: workouts.type })
+        .from(workouts)
+        .where(and(inArray(workouts.profileId, people.map((p) => p.id)), gte(workouts.date, from), lt(workouts.date, to)))
+    : [];
+  return { people, rows };
+}

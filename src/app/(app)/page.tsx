@@ -12,6 +12,10 @@ import { CoachVideo } from "@/components/coach-video";
 import { PageHeader, Progress, Stat } from "@/components/ui";
 import { ActivityRings, Heatmap, ScoreRing, SplitBar, StepsBars } from "@/components/viz";
 import { WeeklyChart } from "@/components/charts";
+import { CountUp } from "@/components/count-up";
+import { Celebration } from "@/components/celebration";
+import { ProgressLinks } from "@/components/progress-links";
+import type { NewRecord } from "@/lib/records";
 
 const QUOTES = [
   "La discipline, c'est choisir entre ce que tu veux maintenant et ce que tu veux le plus.",
@@ -22,6 +26,18 @@ const QUOTES = [
   "La motivation te lance, l'habitude te fait avancer.",
   "Pas besoin d'être extrême, juste constant.",
 ];
+
+/** Records passés dans l'URL par saveWorkout (on ne garde que des valeurs bien formées). */
+function parseRecords(raw: string | string[] | undefined): NewRecord[] {
+  try {
+    const list = JSON.parse(typeof raw === "string" ? raw : "[]");
+    return (Array.isArray(list) ? list : [])
+      .filter((r) => r && typeof r.name === "string" && ["charge", "1RM", "reps"].includes(r.kind) && Number.isFinite(r.value) && Number.isFinite(r.previous))
+      .slice(0, 3);
+  } catch {
+    return [];
+  }
+}
 
 export default async function Dashboard({ searchParams }: PageProps<"/">) {
   const profile = await requireProfile();
@@ -82,9 +98,12 @@ export default async function Dashboard({ searchParams }: PageProps<"/">) {
       />
 
       {sp.saved && (
-        <div className="mb-4 rounded-2xl border border-accent/30 bg-accent/10 px-4 py-3 text-sm text-accent">
-          ✅ Séance enregistrée ! Niveau {s.level} · {s.xp} XP — continue comme ça.
-        </div>
+        <Celebration
+          xp={Number(sp.xp) || 0}
+          level={Number(sp.lvl) || undefined}
+          badges={s.badges.filter((b) => String(sp.b ?? "").split(",").includes(b.id))}
+          records={parseRecords(sp.pr)}
+        />
       )}
 
       {/* HERO */}
@@ -107,7 +126,7 @@ export default async function Dashboard({ searchParams }: PageProps<"/">) {
             <div className="flex items-center gap-3 pt-1">
               <span className="rounded-lg bg-accent-2/20 px-2 py-1 font-mono text-xs font-bold text-accent-2">NIV. {s.level}</span>
               <Progress value={s.levelProgress} className="flex-1" />
-              <span className="font-mono text-xs text-ink-2 tabular-nums">{s.xp} XP</span>
+              <span className="font-mono text-xs text-ink-2 tabular-nums"><CountUp value={s.xp} /> XP</span>
             </div>
           </div>
         </div>
@@ -122,10 +141,12 @@ export default async function Dashboard({ searchParams }: PageProps<"/">) {
           unit="séances"
           sub={s.current.sessions >= target ? "🎉 Objectif atteint" : `Encore ${target - s.current.sessions} pour l'objectif`}
         />
-        <Stat label="Minutes / sem." value={s.current.minutes} unit="min" sub={<span className="inline-flex items-center gap-1"><Timer size={12} /> {s.who7} min éq. OMS (7 j)</span>} />
-        <Stat label="Série" value={s.weekStreak} unit="sem." sub={<span className="inline-flex items-center gap-1"><Flame size={12} className="text-cardio" /> {s.dayStreak} jour(s) d&apos;affilée</span>} />
-        <Stat label="Total" value={s.totalSessions} unit="séances" sub={`${Math.round(s.totalMin / 60)} h · ${s.totalKm.toFixed(0)} km`} />
+        <Stat label="Minutes / sem." value={<CountUp value={s.current.minutes} />} unit="min" sub={<span className="inline-flex items-center gap-1"><Timer size={12} /> {s.who7} min éq. OMS (7 j)</span>} />
+        <Stat label="Série" value={<CountUp value={s.weekStreak} />} unit="sem." sub={<span className="inline-flex items-center gap-1"><Flame size={12} className="text-cardio" /> {s.dayStreak} jour(s) d&apos;affilée</span>} />
+        <Stat label="Total" value={<CountUp value={s.totalSessions} />} unit="séances" sub={`${Math.round(s.totalMin / 60)} h · ${s.totalKm.toFixed(0)} km`} />
       </section>
+
+      <ProgressLinks />
 
       {/* Activité du jour (app Forme, via Raccourcis) */}
       {activity.length > 0 && (() => {
@@ -176,7 +197,7 @@ export default async function Dashboard({ searchParams }: PageProps<"/">) {
                 <Link href={startHref} className="btn-ghost">Mobilité {template.durationMin} min (facultatif)</Link>
               </>
             ) : (
-              <Link href={startHref} className="btn-primary">C&apos;est parti</Link>
+              <Link href={`${startHref}&live=1`} className="btn-primary">C&apos;est parti</Link>
             )}
           </div>
           <div className="mt-4">
@@ -247,8 +268,8 @@ export default async function Dashboard({ searchParams }: PageProps<"/">) {
           <Trophy size={16} className="text-warning" /> Badges · {s.badges.filter((b) => b.got).length}/{s.badges.length}
         </div>
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
-          {s.badges.map((b) => (
-            <div key={b.id} className={`rounded-2xl border p-3 text-center ${b.got ? "border-accent/30 bg-accent/5" : "border-line opacity-40 grayscale"}`}>
+          {s.badges.map((b, i) => (
+            <div key={b.id} style={{ animationDelay: `${i * 40}ms` }} className={`animate-pop rounded-2xl border p-3 text-center ${b.got ? "border-accent/30 bg-accent/5" : "border-line opacity-40 grayscale"}`}>
               <div className="text-2xl">{b.emoji}</div>
               <div className="mt-1 text-xs font-medium">{b.label}</div>
             </div>

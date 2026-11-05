@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, Dumbbell, CalendarClock, PlaySquare, Brain, Plus, UserRound, ArrowLeftRight, Apple } from "lucide-react";
+import { Home, Dumbbell, CalendarClock, PlaySquare, Brain, Plus, UserRound, ArrowLeftRight, Apple, Trophy } from "lucide-react";
 import clsx from "clsx";
 
 const ITEMS = [
@@ -26,7 +26,7 @@ export function Sidebar({ profile }: { profile: { name: string; emoji: string } 
         <Plus size={18} /> Nouvelle séance
       </Link>
       <nav className="flex flex-col gap-1">
-        {[...ITEMS, { href: "/integrations", label: "Apple", icon: Apple }, { href: "/profile", label: "Profil", icon: UserRound }].map(({ href, label, icon: Icon }) => (
+        {[...ITEMS, { href: "/progress", label: "Progrès", icon: Trophy }, { href: "/integrations", label: "Apple", icon: Apple }, { href: "/profile", label: "Profil", icon: UserRound }].map(({ href, label, icon: Icon }) => (
           <Link
             key={href}
             href={href}
@@ -57,20 +57,32 @@ export function Sidebar({ profile }: { profile: { name: string; emoji: string } 
 }
 
 export function TabBar() {
-  const path = usePathname();
+  // Records, bilan et défis sont rangés sous l'onglet Séances sur mobile
+  const path = usePathname().replace(/^\/(progress|bilan|defis)\b.*/, "/workouts");
+  const current = ITEMS.findIndex((i) => active(path, i.href));
   return (
     <nav className="pb-safe fixed inset-x-0 bottom-0 z-40 border-t border-line bg-bg/85 backdrop-blur-xl md:hidden">
-      <div className="mx-auto grid max-w-lg grid-cols-5 px-2 pt-2">
+      <div className="relative mx-auto grid max-w-lg grid-cols-5 px-2 pt-2">
+        {/* Pastille qui glisse sous l'onglet actif */}
+        {current >= 0 && (
+          <span
+            aria-hidden
+            className="pointer-events-none absolute top-1.5 left-2 h-[calc(100%-0.25rem)] w-[calc((100%-1rem)/5)] transition-transform duration-300 ease-[cubic-bezier(.2,.8,.2,1)]"
+            style={{ transform: `translateX(${current * 100}%)` }}
+          >
+            <span className="mx-auto block h-full w-14 rounded-2xl bg-accent/10" />
+          </span>
+        )}
         {ITEMS.map(({ href, label, icon: Icon }) => (
           <Link
             key={href}
             href={href}
             className={clsx(
-              "flex flex-col items-center gap-1 py-1 text-[10px] font-medium",
+              "relative flex flex-col items-center gap-1 py-1 text-[10px] font-medium transition-colors",
               active(path, href) ? "text-accent" : "text-muted",
             )}
           >
-            <Icon size={22} strokeWidth={active(path, href) ? 2.4 : 1.8} />
+            <Icon size={22} strokeWidth={active(path, href) ? 2.4 : 1.8} className={clsx("transition-transform duration-300", active(path, href) && "-translate-y-0.5 scale-110")} />
             {label}
           </Link>
         ))}
@@ -86,7 +98,7 @@ export function Fab() {
     <Link
       href="/workouts/new"
       aria-label="Nouvelle séance"
-      className="fixed right-5 z-40 grid h-14 w-14 place-items-center rounded-2xl bg-accent text-black shadow-lg shadow-accent/20 active:scale-95 md:hidden"
+      className="animate-pop fixed right-5 z-40 grid h-14 w-14 place-items-center rounded-2xl bg-accent text-black shadow-lg shadow-accent/20 transition-transform active:scale-90 md:hidden"
       style={{ bottom: "calc(env(safe-area-inset-bottom) + 76px)" }}
     >
       <Plus size={26} strokeWidth={2.5} />

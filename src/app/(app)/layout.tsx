@@ -1,5 +1,7 @@
 import { Sidebar, TabBar, Fab } from "@/components/nav";
 import { AppBadge } from "@/components/app-badge";
+import { PageTransition } from "@/components/page-transition";
+import { OutboxSync } from "@/components/outbox-sync";
 import { requireProfile } from "@/lib/session";
 import { countThisWeek } from "@/lib/data";
 
@@ -10,11 +12,12 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
     <div className="flex min-h-dvh">
       <Sidebar profile={{ name: me.name, emoji: me.emoji }} />
       <main className="pt-safe min-w-0 flex-1 pb-28 md:pb-10">
-        <div className="mx-auto w-full max-w-5xl px-4 py-5 sm:px-6 md:py-8">{children}</div>
+        <PageTransition>{children}</PageTransition>
       </main>
       <Fab />
       <TabBar />
       <AppBadge count={remaining} />
+      <OutboxSync pid={me.id} />
     </div>
   );
 }

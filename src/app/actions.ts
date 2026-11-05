@@ -5,10 +5,14 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { and, eq, isNull, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { plans, profile, videos, weights, workouts, type Exercise } from "@/lib/schema";
+import { plans, profile, videos, weights, workouts, type Exercise, type Workout } from "@/lib/schema";
+import { getWorkouts } from "@/lib/data";
+import { computeStats } from "@/lib/stats";
+import { newBadges } from "@/lib/notifications";
+import { detectRecords, exerciseIndex, exerciseMemos } from "@/lib/records";
 import { SESSION_COOKIE, checkPassword, sessionToken } from "@/lib/auth";
 import { after } from "next/server";
-import { COOKIE_OPTS, PROFILE_COOKIE, requireAuth, requireProfile, setUnlockedProfile } from "@/lib/session";
+import { COOKIE_OPTS, PROFILE_COOKIE, getActiveProfile, requireAuth, requireProfile, setUnlockedProfile } from "@/lib/session";
 import { checkProfilePin, hashPin, newPinError } from "@/lib/pin";
 import type { FormState } from "@/components/action-form";
 import { notifyNewBadges } from "@/lib/push";
@@ -140,9 +144,8 @@ export async function deleteProfile(_prev: FormState, f: FormData): Promise<Form
 }
 
 // ---------- séances ----------
-export async function saveWorkout(f: FormData) {
-  const me = await requireProfile();
-  const pid = me.id;
+/** Champs d'une séance lus depuis le formulaire (partagé par l'enregistrement direct et la synchro hors-ligne). */
+async function workoutValues(pid: number, f: FormData) {
   const type = str(f, "type");
   if (!TYPE_BY_ID[type]) throw new Error("Type inconnu");
   let exercises: Exercise[] = [];
@@ -173,14 +176,62 @@ export async function saveWorkout(f: FormData) {
     videoId: await ownVideoId(pid, num(f, "videoId")),
     exercises,
   };
+  return values;
+}
+
+export async function saveWorkout(f: FormData) {
+  const me = await requireProfile();
+  const pid = me.id;
+  const values = await workoutValues(pid, f);
   const id = idOf(f);
-  if (id) await db.update(workouts).set(values).where(and(eq(workouts.id, id), eq(workouts.profileId, pid)));
-  else {
-    const [row] = await db.insert(workouts).values({ ...values, profileId: pid }).returning({ id: workouts.id });
-    after(() => notifyNewBadges(me, row.id)); // push « nouveau badge » sur les autres appareils
+  if (id) {
+    await db.update(workouts).set(values).where(and(eq(workouts.id, id), eq(workouts.profileId, pid)));
+    revalidateAll();
+    redirect("/workouts");
   }
+  const history = await getWorkouts(pid);
+  const [row] = await db.insert(workouts).values({ ...values, profileId: pid }).returning();
+  after(() => notifyNewBadges(me, row.id)); // push « nouveau badge » sur les autres appareils
   revalidateAll();
-  redirect(id ? "/workouts" : "/?saved=1");
+  redirect(`/?${celebrationParams(me.weeklySessionsTarget, history, row)}`);
+}
+
+/**
+ * Séance saisie sans réseau puis envoyée au retour de la connexion (voir <OutboxSync>).
+ * `clientId` sert de clé de dédoublonnage : renvoyer deux fois la même séance ne crée qu'une ligne.
+ */
+export async function syncOfflineWorkout(pidAtCapture: number, clientId: string, fields: Record<string, string>) {
+  await requireAuth();
+  const me = await getActiveProfile();
+  // Séance saisie sur un autre profil : on la garde en attente jusqu'à ce que ce profil soit ouvert
+  if (!me || me.id !== pidAtCapture) return { ok: false as const, reason: "profile" as const };
+  if (!/^[\w-]{8,64}$/.test(clientId)) return { ok: true as const }; // entrée corrompue : on l'abandonne
+  const f = new FormData();
+  for (const [k, v] of Object.entries(fields)) if (typeof v === "string") f.set(k, v);
+  f.delete("id");
+  const values = await workoutValues(me.id, f).catch(() => null);
+  if (!values) return { ok: true as const };
+  const [row] = await db
+    .insert(workouts)
+    .values({ ...values, profileId: me.id, externalId: `offline:${clientId}` })
+    .onConflictDoNothing()
+    .returning({ id: workouts.id });
+  if (row) after(() => notifyNewBadges(me, row.id));
+  revalidateAll();
+  return { ok: true as const };
+}
+
+/** Ce qu'on fête sur l'accueil après une nouvelle séance : niveau, badges, records (lu par <Celebration>). */
+function celebrationParams(target: number, history: Workout[], row: Workout) {
+  const before = computeStats(history, target);
+  const after = computeStats([row, ...history], target);
+  const q = new URLSearchParams({ saved: "1", xp: String(after.xp - before.xp) });
+  if (after.level > before.level) q.set("lvl", String(after.level));
+  const fresh = newBadges(before, after);
+  if (fresh.length) q.set("b", fresh.map((b) => b.id).join(","));
+  const prs = detectRecords(exerciseMemos(exerciseIndex(history)), row.exercises).slice(0, 3);
+  if (prs.length) q.set("pr", JSON.stringify(prs));
+  return q.toString();
 }
 
 /** N'accepte qu'une vidéo du profil (évite de lier/afficher la vidéo d'un autre profil). */
@@ -199,6 +250,13 @@ export async function deleteWorkout(f: FormData) {
   if (id) await db.delete(workouts).where(and(eq(workouts.id, id), eq(workouts.profileId, pid)));
   revalidateAll();
   redirect("/workouts");
+}
+
+// ---------- défis ----------
+export async function toggleChallenges() {
+  const me = await requireProfile();
+  await db.update(profile).set({ shareChallenges: !me.shareChallenges, updatedAt: new Date() }).where(eq(profile.id, me.id));
+  revalidateAll();
 }
 
 // ---------- planning ----------
