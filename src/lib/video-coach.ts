@@ -32,6 +32,7 @@ const TEMPLATE_THEME: Record<string, string[]> = {
   nage: ["natation", "récup", "étirements"],
   rando: ["marche", "récup", "étirements"],
   boxe: ["boxe", "cardio"],
+  corde: ["hiit", "cardio"],
   "yoga-flow": ["yoga"],
   mobility: ["mobilité", "étirements", "récup"],
 };
@@ -40,7 +41,7 @@ const TEMPLATE_THEME: Record<string, string[]> = {
 const TYPE_THEME: Record<string, string[]> = {
   muscu: ["full body"], calisthenics: ["full body", "sans matériel"], crossfit: ["hiit", "full body"], hiit: ["hiit", "cardio"],
   course: ["course", "récup", "étirements"], velo: ["vélo", "récup"], natation: ["natation", "récup", "étirements"],
-  marche: ["marche", "récup", "étirements"], boxe: ["boxe", "cardio"], sport: ["cardio", "récup"], cardio: ["cardio", "hiit"],
+  marche: ["marche", "récup", "étirements"], boxe: ["boxe", "cardio"], corde: ["hiit", "cardio"], sport: ["cardio", "récup"], cardio: ["cardio", "hiit"],
   yoga: ["yoga"], mobilite: ["mobilité", "étirements", "récup"],
 };
 

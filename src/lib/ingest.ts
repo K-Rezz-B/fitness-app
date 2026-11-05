@@ -15,6 +15,7 @@ const norm = (s: string) =>
 
 /** Noms d'exercices Apple (FR/EN) → type FitPulse. Ordre = priorité (le plus spécifique d'abord). */
 const APPLE_TYPES: [string, string[]][] = [
+  ["corde", ["corde", "jump rope", "jumprope", "skipping", "saut a la corde"]],
   ["hiit", ["hiit", "intervalle", "high intensity", "haute intensite"]],
   ["crossfit", ["fonctionnel", "functional", "crossfit", "cross training", "cross-training"]],
   ["yoga", ["yoga"]],

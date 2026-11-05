@@ -75,6 +75,10 @@ export const TEMPLATES: Template[] = [
   T("boxe", "boxe", "Boxe shadow & sac", 40, 8, "Cardio & coordination", [
     ["Shadow boxing", 3, "3 min"], ["Sac de frappe", 6, "3 min"], ["Gainage", 3, "45 s"],
   ]),
+  T("corde", "corde", "Corde à sauter en intervalles", 25, 8, "Cardio, coordination & mollets", [
+    ["Échauffement sauts lents", 1, "3 min"], ["Sauts rapides / 30 s récup", 10, "1 min"],
+    ["Montées de genoux ou double unders", 5, "30 s"], ["Étirements mollets & chevilles", 1, "3 min"],
+  ]),
   T("yoga-flow", "yoga", "Yoga vinyasa", 40, 3, "Souplesse & respiration", [
     ["Salutations au soleil", 5, "1 cycle"], ["Guerrier I/II", 2, "5 resp."], ["Pigeon", 2, "1 min/côté"], ["Savasana", 1, "5 min"],
   ]),
