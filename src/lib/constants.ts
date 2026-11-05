@@ -26,6 +26,7 @@ export const WORKOUT_TYPES: WorkoutType[] = [
   { id: "velo", label: "Vélo", emoji: "🚴", category: "cardio", met: 7.5, hasDistance: true },
   { id: "natation", label: "Natation", emoji: "🏊", category: "cardio", met: 7, hasDistance: true },
   { id: "marche", label: "Marche / Rando", emoji: "🥾", category: "cardio", met: 4.3, hasDistance: true },
+  { id: "corde", label: "Corde à sauter", emoji: "🪢", category: "cardio", met: 11.8 },
   { id: "boxe", label: "Boxe / Combat", emoji: "🥊", category: "cardio", met: 9 },
   { id: "sport", label: "Sport collectif", emoji: "⚽", category: "cardio", met: 7 },
   { id: "cardio", label: "Cardio (autre)", emoji: "❤️‍🔥", category: "cardio", met: 6 },

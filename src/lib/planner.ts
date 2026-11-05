@@ -16,7 +16,7 @@ type Zone = "full" | "upper" | "lower" | null;
 export const EQUIPMENT: Record<Equipment, string> = { gym: "Salle de sport", home: "Maison avec haltères", bodyweight: "Sans matériel" };
 export const LEVELS: Record<Level, string> = { beginner: "Débutant (< 6 mois)", intermediate: "Intermédiaire (6 mois - 2 ans)", advanced: "Confirmé (> 2 ans)" };
 /** Sports « cardio » proposés dans le questionnaire */
-export const PLANNER_SPORTS = ["course", "velo", "natation", "marche", "boxe", "hiit", "yoga"] as const;
+export const PLANNER_SPORTS = ["course", "velo", "natation", "marche", "corde", "boxe", "hiit", "yoga"] as const;
 export const PHASES = [
   { label: "Mise en route", hint: "charges de référence, RPE 7" },
   { label: "Progression", hint: "charges en hausse, RPE 7-8" },
@@ -41,6 +41,7 @@ const CARDIO: Record<string, { easy?: string; hard?: string; long?: string }> = 
   velo: { easy: "velo-z2", hard: "velo-sst" },
   natation: { easy: "nage" },
   marche: { easy: "rando" },
+  corde: { hard: "corde" },
   boxe: { hard: "boxe" },
   hiit: { hard: "tabata" },
 };
@@ -201,12 +202,12 @@ const WHY: Record<Kind, string> = {
 };
 
 // ---------- programmes compatibles avec le profil (matériel, sports, niveau) ----------
-type Needs = "gym" | "dumbbells" | "none" | "bike" | "pool" | "bag";
+type Needs = "gym" | "dumbbells" | "none" | "bike" | "pool" | "bag" | "rope";
 const NEEDS: Record<string, Needs> = {
   "fullbody-a": "gym", "fullbody-b": "gym", push: "gym", pull: "gym", legs: "gym", upper: "gym", "upper-b": "gym", "lower-b": "gym",
   emom: "gym", wod: "gym", // kettlebell, barre de traction
   "db-fullbody-a": "dumbbells", "db-fullbody-b": "dumbbells", "db-upper": "dumbbells", "db-lower": "dumbbells",
-  "velo-z2": "bike", "velo-sst": "bike", nage: "pool", boxe: "bag",
+  "velo-z2": "bike", "velo-sst": "bike", nage: "pool", boxe: "bag", corde: "rope",
 };
 const HARD = new Set(["fractionne", "tabata", "emom", "wod", "velo-sst"]);
 
@@ -223,6 +224,7 @@ export function templatesFor(o: { equipment: Equipment; sports: string[]; level:
     if (n === "bike") return o.sports.includes("velo") || o.equipment === "gym";
     if (n === "pool") return o.sports.includes("natation");
     if (n === "bag") return o.sports.includes("boxe");
+    if (n === "rope") return o.sports.includes("corde");
     return true;
   });
 }
