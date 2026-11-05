@@ -10,7 +10,8 @@ import { SESSION_COOKIE, checkPassword, sessionToken } from "@/lib/auth";
 import { after } from "next/server";
 import { COOKIE_OPTS, PROFILE_COOKIE, requireAuth, requireProfile } from "@/lib/session";
 import { notifyNewBadges } from "@/lib/push";
-import { detectPlatform } from "@/lib/video";
+import { detectPlatform, youtubeId } from "@/lib/video";
+import { CHANNELS, VIDEO_CATALOG, catalogUrl } from "@/lib/video-catalog";
 import { PROFILE_EMOJIS, TYPE_BY_ID } from "@/lib/constants";
 
 // ---------- helpers ----------
@@ -215,6 +216,30 @@ export async function saveVideo(f: FormData) {
   const id = idOf(f);
   if (id) await db.update(videos).set(values).where(and(eq(videos.id, id), eq(videos.profileId, pid)));
   else await db.insert(videos).values({ ...values, profileId: pid });
+  revalidateAll();
+}
+
+/** Ajoute à la vidéothèque du profil les vidéos de la sélection du coach qu'il n'a pas encore. */
+export async function importVideoSelection() {
+  const pid = await currentPid();
+  const have = new Set(
+    (await db.select({ url: videos.url }).from(videos).where(eq(videos.profileId, pid))).map((v) => youtubeId(v.url)),
+  );
+  // Insérées à l'envers : la vidéothèque (plus récentes d'abord) suit l'ordre de la sélection
+  const missing = VIDEO_CATALOG.filter((c) => !have.has(c.yt)).reverse();
+  if (missing.length)
+    await db.insert(videos).values(
+      missing.map((c) => ({
+        profileId: pid,
+        url: catalogUrl(c),
+        title: c.title,
+        platform: "youtube",
+        tags: c.tags,
+        type: c.type,
+        durationMin: c.durationMin,
+        notes: CHANNELS[c.channel].name,
+      })),
+    );
   revalidateAll();
 }
 

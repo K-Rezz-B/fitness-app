@@ -18,7 +18,7 @@ export const getPlan = async (pid: number, id: number) =>
 export const getPlans = (pid: number) =>
   db.select().from(plans).where(eq(plans.profileId, pid)).orderBy(asc(plans.weekday), asc(plans.time));
 export const getVideos = (pid: number) =>
-  db.select().from(videos).where(eq(videos.profileId, pid)).orderBy(desc(videos.favorite), desc(videos.createdAt));
+  db.select().from(videos).where(eq(videos.profileId, pid)).orderBy(desc(videos.favorite), desc(videos.createdAt), desc(videos.id));
 export const getPasskeys = (pid: number) =>
   db.select().from(passkeys).where(eq(passkeys.profileId, pid)).orderBy(desc(passkeys.createdAt));
 export const getPushSubscriptions = (pid: number) =>
