@@ -13,6 +13,7 @@ import { PageHeader } from "@/components/ui";
 import { CopyButton } from "@/components/copy-button";
 import { PushToggle } from "@/components/push-toggle";
 import { PasskeyRegisterButton } from "@/components/passkeys";
+import { ConfirmButton, Form, SubmitButton } from "@/components/forms";
 
 export const metadata: Metadata = { title: "Apple" };
 
@@ -65,7 +66,7 @@ export default async function Integrations() {
 
   return (
     <>
-      <PageHeader title="Apple" subtitle={`Santé, Watch, notifications, Face ID et widget · profil ${me.name}`} />
+      <PageHeader title="Apple" back="/profile" subtitle={`Santé, Watch, notifications, Face ID et widget · profil ${me.name}`} />
 
       {/* ---------------- Apple Santé ---------------- */}
       <Section icon={<HeartPulse size={18} className="text-cardio" />} title="Apple Santé & Apple Watch (Raccourcis)">
@@ -85,18 +86,18 @@ export default async function Integrations() {
               </div>
               <p className="mb-3 text-xs text-muted">Il donne accès à ce profil : garde-le pour tes raccourcis et ton widget. Le régénérer coupe les anciens raccourcis.</p>
               <div className="flex gap-2">
-                <form action={generateApiToken}>
-                  <button className="btn-ghost text-xs">Régénérer</button>
-                </form>
-                <form action={revokeApiToken}>
-                  <button className="btn-ghost text-xs text-critical">Désactiver</button>
-                </form>
+                <Form action={generateApiToken} success="Nouveau jeton généré">
+                  <ConfirmButton className="btn-ghost text-xs" confirmLabel="Régénérer ?" armedClassName="border-warning text-warning">Régénérer</ConfirmButton>
+                </Form>
+                <Form action={revokeApiToken} success="Jeton désactivé">
+                  <ConfirmButton className="btn-ghost text-xs text-critical" confirmLabel="Désactiver ?">Désactiver</ConfirmButton>
+                </Form>
               </div>
             </>
           ) : (
-            <form action={generateApiToken}>
-              <button className="btn-primary">Générer mon jeton</button>
-            </form>
+            <Form action={generateApiToken} success="Jeton généré">
+              <SubmitButton className="btn-primary">Générer mon jeton</SubmitButton>
+            </Form>
           )}
         </div>
 
@@ -225,7 +226,7 @@ export default async function Integrations() {
         <div className="mb-4">
           <PushToggle vapidKey={pushConfigured() ? vapidPublicKey() : null} />
         </div>
-        <form action={saveNotificationPrefs} className="space-y-2 border-t border-line pt-4 text-sm">
+        <Form action={saveNotificationPrefs} success="Préférences de notification enregistrées" className="space-y-2 border-t border-line pt-4 text-sm">
           {[
             { name: "notifyStreak", label: "Rappel du soir (série en danger, séance prévue non faite, objectif hebdo)", on: me.notifyStreak },
             { name: "notifyWeekly", label: "Bilan de la semaine le dimanche", on: me.notifyWeekly },
@@ -236,8 +237,8 @@ export default async function Integrations() {
               {o.label}
             </label>
           ))}
-          <button className="btn-ghost mt-2">Enregistrer</button>
-        </form>
+          <SubmitButton className="btn-ghost mt-2">Enregistrer</SubmitButton>
+        </Form>
         {subs.length > 0 && (
           <p className="mt-3 text-xs text-muted">
             Appareils abonnés : {subs.map((s) => `${s.userAgent ?? "Appareil"} (${fmtDate(s.createdAt)})`).join(" · ")}
@@ -260,10 +261,12 @@ export default async function Integrations() {
                   ajoutée le {fmtDate(k.createdAt)}
                   {k.lastUsedAt && ` · utilisée le ${fmtDate(k.lastUsedAt)}`}
                 </span>
-                <form action={deletePasskey} className="ml-auto">
+                <Form action={deletePasskey} success="Passkey supprimée" className="ml-auto">
                   <input type="hidden" name="id" value={k.id} />
-                  <button aria-label="Supprimer la passkey" className="text-muted hover:text-critical"><Trash2 size={14} /></button>
-                </form>
+                  <ConfirmButton aria-label="Supprimer la passkey" className="rounded-lg px-1.5 py-1 text-xs text-muted hover:text-critical" armedClassName="bg-critical text-white">
+                    <Trash2 size={14} />
+                  </ConfirmButton>
+                </Form>
               </li>
             ))}
           </ul>

@@ -50,7 +50,7 @@ export default async function Evolution({ searchParams }: PageProps<"/evolution"
   if (workouts.length === 0 && weights.length === 0 && activity.length === 0) {
     return (
       <>
-        <PageHeader title="Mon évolution" />
+        <PageHeader title="Mon évolution" back="/workouts" />
         <ProgressLinks current="evolution" />
         <Empty emoji="📈" title="Pas encore de données">
           Enregistre une <Link href="/workouts/new" className="text-accent">séance</Link>, une{" "}
@@ -106,7 +106,7 @@ export default async function Evolution({ searchParams }: PageProps<"/evolution"
 
   return (
     <>
-      <PageHeader title="Mon évolution" subtitle={`Toutes tes données, du ${year(range.from)} au ${year(range.to)}`} />
+      <PageHeader title="Mon évolution" back="/workouts" subtitle={`Toutes tes données, du ${year(range.from)} au ${year(range.to)}`} />
       <ProgressLinks current="evolution" />
 
       {/* Filtre unique : il s'applique à tout ce qui suit */}

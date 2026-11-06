@@ -2,18 +2,21 @@ import Link from "next/link";
 import clsx from "clsx";
 import type { ReactNode } from "react";
 import { getActiveProfile } from "@/lib/session";
+import { BackLink } from "./back-link";
 
-export async function PageHeader({ title, subtitle, action }: { title: string; subtitle?: string; action?: ReactNode }) {
+/** En-tête de page. `back` : page parente (affiche « ‹ Retour » pour les sous-pages). */
+export async function PageHeader({ title, subtitle, action, back }: { title: string; subtitle?: string; action?: ReactNode; back?: string }) {
   const me = await getActiveProfile();
   return (
     <header className="mb-6 flex items-end justify-between gap-4">
       <div className="min-w-0">
+        {back && <BackLink fallback={back} />}
         <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">{title}</h1>
         {subtitle && <p className="mt-1 text-sm text-muted">{subtitle}</p>}
       </div>
       <div className="flex shrink-0 items-center gap-2">
         {action}
-        <Link href="/profile" aria-label={`Profil ${me?.name ?? ""}`} className="grid h-10 w-10 place-items-center rounded-full border border-line bg-surface text-lg md:hidden">
+        <Link href="/profile" aria-label={`Profil ${me?.name ?? ""}`} className="grid h-10 w-10 place-items-center rounded-full border border-line bg-surface text-lg transition active:scale-90 md:hidden">
           {me?.emoji ?? "💪"}
         </Link>
       </div>

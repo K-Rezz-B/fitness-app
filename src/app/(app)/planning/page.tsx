@@ -8,6 +8,7 @@ import { WEEKDAYS, WORKOUT_TYPES, typeInfo, CATEGORIES } from "@/lib/constants";
 import { addDays, dayKey, today, weekStart } from "@/lib/dates";
 import { deletePlan, savePlan, togglePlan } from "@/app/actions";
 import { CopyButton } from "@/components/copy-button";
+import { ConfirmButton, Form, SubmitButton } from "@/components/forms";
 import { Empty, PageHeader } from "@/components/ui";
 import type { Plan } from "@/lib/schema";
 import { CoachSection } from "./coach-section";
@@ -146,7 +147,7 @@ export default async function Planning() {
           const info = typeInfo(p.type);
           return (
             <details key={p.id} className={`card group p-0 ${p.active ? "" : "opacity-50"}`}>
-              <summary className="flex cursor-pointer list-none items-center gap-3 p-4">
+              <summary className="flex cursor-pointer list-none items-center gap-3 p-4 transition active:scale-[.99]">
                 <div className="grid h-11 w-11 place-items-center rounded-2xl bg-surface-2 text-xl" style={{ boxShadow: `inset 0 -3px 0 ${CATEGORIES[info.category].color}` }}>{info.emoji}</div>
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
@@ -155,23 +156,23 @@ export default async function Planning() {
                   </div>
                   <div className="text-xs text-muted">{WEEKDAYS[p.weekday - 1]} · {p.time} · {p.durationMin} min · 🔔 {p.reminderMin ? `${p.reminderMin >= 60 ? `${p.reminderMin / 60} h` : `${p.reminderMin} min`} avant` : "à l'heure"}</div>
                 </div>
-                <Pencil size={16} className="text-muted" />
+                <Pencil size={16} className="text-muted transition group-open:text-accent" />
               </summary>
               <div className="border-t border-line p-4">
-                <form action={savePlan} className="space-y-3">
+                <Form action={savePlan} success="Créneau enregistré" collapse className="space-y-3">
                   <PlanFields p={p} />
-                  <button className="btn-primary w-full">Enregistrer</button>
-                </form>
+                  <SubmitButton className="btn-primary w-full">Enregistrer</SubmitButton>
+                </Form>
                 <div className="mt-2 flex gap-2">
-                  <form action={togglePlan} className="flex-1">
+                  <Form action={togglePlan} success={p.active ? "Créneau mis en pause" : "Créneau réactivé"} className="flex-1">
                     <input type="hidden" name="id" value={p.id} />
-                    <button className="btn-ghost w-full">{p.active ? "Mettre en pause" : "Réactiver"}</button>
-                  </form>
+                    <SubmitButton className="btn-ghost w-full">{p.active ? "Mettre en pause" : "Réactiver"}</SubmitButton>
+                  </Form>
                   <a href={`/api/plans/ics?id=${p.id}`} className="btn-ghost" aria-label="Importer"><Download size={16} /></a>
-                  <form action={deletePlan}>
+                  <Form action={deletePlan} success="Créneau supprimé">
                     <input type="hidden" name="id" value={p.id} />
-                    <button className="btn-ghost text-critical" aria-label="Supprimer"><Trash2 size={16} /></button>
-                  </form>
+                    <ConfirmButton className="btn-ghost text-critical" aria-label="Supprimer"><Trash2 size={16} /></ConfirmButton>
+                  </Form>
                 </div>
               </div>
             </details>
@@ -181,10 +182,10 @@ export default async function Planning() {
 
       <section className="card">
         <div className="mb-3 font-semibold">➕ Ajouter un créneau</div>
-        <form action={savePlan} className="space-y-3">
+        <Form action={savePlan} success="Créneau ajouté au planning" className="space-y-3">
           <PlanFields />
-          <button className="btn-primary w-full">Ajouter au planning</button>
-        </form>
+          <SubmitButton className="btn-primary w-full">Ajouter au planning</SubmitButton>
+        </Form>
       </section>
     </>
   );

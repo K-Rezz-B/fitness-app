@@ -10,6 +10,7 @@ import { PageHeader } from "@/components/ui";
 import { EmojiPicker } from "@/components/emoji-picker";
 import { ActionForm, NewPinFields, PinInput } from "@/components/action-form";
 import { PasskeyRegisterButton } from "@/components/passkeys";
+import { ConfirmButton, Form, SubmitButton } from "@/components/forms";
 
 export const metadata: Metadata = { title: "Profil" };
 
@@ -41,26 +42,28 @@ export default async function Profile({ searchParams }: PageProps<"/profile">) {
       <div className="grid gap-4 lg:grid-cols-2">
         <section className="card">
           <div className="mb-3 font-semibold">⚖️ Nouvelle pesée</div>
-          <form action={addWeight} className="grid grid-cols-3 gap-2">
+          <Form action={addWeight} success="Pesée enregistrée ⚖️" className="grid grid-cols-3 gap-2">
             <input name="weightKg" type="number" step="0.1" inputMode="decimal" placeholder="kg" required className="input" />
             <input name="bodyFatPct" type="number" step="0.1" inputMode="decimal" placeholder="% gras" className="input" />
             <input name="date" type="date" defaultValue={today()} required className="input" />
-            <button className="btn-primary col-span-3">Enregistrer</button>
-          </form>
+            <SubmitButton className="btn-primary col-span-3">Enregistrer</SubmitButton>
+          </Form>
           <ul className="mt-4 max-h-80 divide-y divide-line overflow-y-auto">
             {ws.map((w, i) => {
               const prev = ws[i + 1];
               const d = prev ? w.weightKg - prev.weightKg : 0;
               return (
-                <li key={w.id} className="flex items-center gap-3 py-2 text-sm">
+                <li key={w.id} className="animate-fade-up flex items-center gap-3 py-2 text-sm">
                   <span className="w-20 text-muted">{fmtDate(w.date)}</span>
                   <span className="font-mono font-semibold tabular-nums">{w.weightKg.toFixed(1)} kg</span>
                   {prev && <span className="font-mono text-xs text-ink-2 tabular-nums">{d > 0 ? "▲ +" : d < 0 ? "▼ " : "= "}{d !== 0 ? d.toFixed(1) : ""}</span>}
                   {w.bodyFatPct && <span className="chip py-0.5">{w.bodyFatPct} %</span>}
-                  <form action={deleteWeight} className="ml-auto">
+                  <Form action={deleteWeight} success="Pesée supprimée" className="ml-auto">
                     <input type="hidden" name="id" value={w.id} />
-                    <button aria-label="Supprimer" className="text-muted hover:text-critical"><Trash2 size={14} /></button>
-                  </form>
+                    <ConfirmButton aria-label="Supprimer" confirmLabel="Supprimer ?" className="rounded-lg px-1.5 py-1 text-xs text-muted hover:text-critical" armedClassName="bg-critical text-white">
+                      <Trash2 size={14} />
+                    </ConfirmButton>
+                  </Form>
                 </li>
               );
             })}
@@ -69,7 +72,7 @@ export default async function Profile({ searchParams }: PageProps<"/profile">) {
 
         <section className="card">
           <div className="mb-3 font-semibold">🧍 Mes infos</div>
-          <form action={saveProfile} className="grid grid-cols-2 gap-3">
+          <Form action={saveProfile} success="Profil enregistré" className="grid grid-cols-2 gap-3">
             <div className="col-span-2">
               <label className="label">Prénom</label>
               <input name="name" defaultValue={p.name} required maxLength={60} className="input" />
@@ -120,8 +123,8 @@ export default async function Profile({ searchParams }: PageProps<"/profile">) {
               <label className="label">Objectif pas / jour</label>
               <input name="stepsGoal" type="number" inputMode="numeric" min={1000} max={30000} step={500} defaultValue={p.stepsGoal} className="input" />
             </div>
-            <button className="btn-primary col-span-2">Enregistrer</button>
-          </form>
+            <SubmitButton className="btn-primary col-span-2">Enregistrer</SubmitButton>
+          </Form>
         </section>
       </div>
 
@@ -166,9 +169,9 @@ export default async function Profile({ searchParams }: PageProps<"/profile">) {
           </details>
         </div>
         <form action={lockProfile} className="mt-4">
-          <button className="btn-ghost w-full sm:w-auto">
+          <SubmitButton className="btn-ghost w-full sm:w-auto">
             <Lock size={16} /> Verrouiller maintenant
-          </button>
+          </SubmitButton>
         </form>
       </section>
 

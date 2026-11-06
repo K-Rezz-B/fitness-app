@@ -23,7 +23,7 @@ export default async function Progress({ searchParams }: PageProps<"/progress">)
   if (!sel) {
     return (
       <>
-        <PageHeader title="Progrès" subtitle="Records et évolution par exercice" />
+        <PageHeader title="Progrès" back="/workouts" subtitle="Records et évolution par exercice" />
         <ProgressLinks current="progress" />
         <Empty emoji="🏋️" title="Pas encore d'exercices détaillés">
           Ajoute tes exercices (séries, reps, charges) quand tu enregistres une séance : tes records et ta progression apparaîtront ici.
@@ -39,7 +39,7 @@ export default async function Progress({ searchParams }: PageProps<"/progress">)
 
   return (
     <>
-      <PageHeader title="Progrès" subtitle={`${index.length} exercice(s) suivis`} />
+      <PageHeader title="Progrès" back="/workouts" subtitle={`${index.length} exercice(s) suivis`} />
       <ProgressLinks current="progress" />
 
       <nav className="-mx-4 mb-4 flex gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:flex-wrap sm:px-0" aria-label="Exercices">

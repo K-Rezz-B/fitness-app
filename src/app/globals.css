@@ -22,6 +22,10 @@
 
 :root {
   color-scheme: dark;
+  /* Courbe « naturelle » commune à toutes les animations : départ vif, arrivée douce */
+  --ease-fluid: cubic-bezier(0.2, 0.8, 0.2, 1);
+  /* Permet d'animer jusqu'à height: auto (ouverture des <details>) */
+  interpolate-size: allow-keywords;
 }
 
 html,
@@ -31,8 +35,54 @@ body {
   -webkit-tap-highlight-color: transparent;
 }
 
+html {
+  /* Pas de zoom au double tap (taps rapides sur les séries, les onglets…) ; le pincement reste possible */
+  touch-action: manipulation;
+}
+/* Pas de défilement de la page derrière une feuille modale ouverte */
+html:has(dialog[open]) {
+  overflow: hidden;
+}
+
 body {
   overscroll-behavior-y: none;
+}
+
+/* Mobile : la barre d'onglets et le bouton + s'effacent pendant la saisie (clavier ouvert),
+   au lieu de flotter par-dessus les champs. */
+.tabbar,
+.fab {
+  transition:
+    translate 0.25s var(--ease-fluid),
+    scale 0.15s;
+}
+@media (max-width: 767px) {
+  html:has(:is(input:not([type="checkbox"], [type="radio"], [type="range"], [type="hidden"]), textarea, select):focus) :is(.tabbar, .fab) {
+    translate: 0 calc(100% + 120px);
+  }
+}
+
+/* Boutons et navigation : pas de sélection de texte ni de menu « aperçu du lien » à l'appui long */
+button,
+summary,
+nav a {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+
+@layer components {
+  /* Cartes cliquables : légère pression au toucher */
+  a.card:active,
+  button.card:active {
+    scale: 0.985;
+  }
+
+  .skeleton {
+    border-radius: var(--radius-xl);
+    background: linear-gradient(100deg, var(--color-surface-2) 40%, #2b2b30 50%, var(--color-surface-2) 60%) 0 0 / 300% 100%;
+    animation: shimmer 1.6s linear infinite;
+  }
 }
 
 @utility card {
@@ -120,19 +170,165 @@ input[type="range"] {
   }
 }
 
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes shimmer {
+  from {
+    background-position: 100% 0;
+  }
+  to {
+    background-position: 0 0;
+  }
+}
+
 /* Cartes de page qui apparaissent en cascade (enfants directs du conteneur de page).
    fill-mode « backwards » et pas « both » : une animation de transform qui reste active
    ferait de la carte le repère des éléments position: fixed qu'elle contient (minuteur, modale). */
 .stagger > * {
-  animation: fade-up 0.45s cubic-bezier(0.2, 0.8, 0.2, 1) backwards;
+  animation: fade-up 0.38s var(--ease-fluid) backwards;
 }
-.stagger > *:nth-child(2) { animation-delay: 40ms; }
-.stagger > *:nth-child(3) { animation-delay: 80ms; }
-.stagger > *:nth-child(4) { animation-delay: 120ms; }
-.stagger > *:nth-child(5) { animation-delay: 160ms; }
-.stagger > *:nth-child(6) { animation-delay: 200ms; }
-.stagger > *:nth-child(7) { animation-delay: 240ms; }
-.stagger > *:nth-child(n + 8) { animation-delay: 280ms; }
+.stagger > *:nth-child(2) { animation-delay: 30ms; }
+.stagger > *:nth-child(3) { animation-delay: 60ms; }
+.stagger > *:nth-child(4) { animation-delay: 90ms; }
+.stagger > *:nth-child(5) { animation-delay: 120ms; }
+.stagger > *:nth-child(6) { animation-delay: 150ms; }
+.stagger > *:nth-child(n + 7) { animation-delay: 180ms; }
+/* L'en-tête ne bouge pas : la transition de page l'anime déjà, et il reste en place
+   quand le squelette de chargement laisse la place au vrai contenu (même titre au même endroit). */
+.stagger > header:first-child {
+  animation: none;
+}
+.stagger > .skeleton-page {
+  animation: fade-in 0.2s ease-out backwards;
+}
+
+/* ---------- Barre de progression de navigation (<NavFeedback>) ---------- */
+.nav-progress {
+  position: fixed;
+  inset-inline: 0;
+  top: env(safe-area-inset-top);
+  z-index: 70;
+  height: 2.5px;
+  pointer-events: none;
+  background: linear-gradient(90deg, var(--color-accent), var(--color-accent-2));
+  box-shadow: 0 0 10px rgb(198 244 50 / 0.45);
+  transform-origin: left;
+  transform: scaleX(0);
+  opacity: 0;
+}
+/* N'apparaît que si la page tarde (> 150 ms), avance vite puis ralentit sans jamais finir seule */
+.nav-progress[data-state="loading"] {
+  opacity: 1;
+  animation: nav-progress 10s cubic-bezier(0.05, 0.7, 0.1, 1) 150ms both;
+}
+.nav-progress[data-state="done"] {
+  transform: scaleX(1);
+  opacity: 0;
+  transition:
+    transform 0.2s ease-out,
+    opacity 0.3s ease 0.15s;
+}
+@keyframes nav-progress {
+  to {
+    transform: scaleX(0.94);
+  }
+}
+
+/* ---------- Ouverture fluide des <details> (Chrome, Edge ; instantanée ailleurs) ---------- */
+@supports selector(::details-content) {
+  details::details-content {
+    block-size: 0;
+    overflow: clip;
+    transition:
+      block-size 0.3s var(--ease-fluid),
+      content-visibility 0.3s allow-discrete;
+  }
+  details[open]::details-content {
+    block-size: auto;
+  }
+}
+
+/* ---------- Feuilles modales (<Sheet>, <dialog> natif) ---------- */
+/* Mobile : glisse depuis le bas. Ordinateur : léger zoom au centre. Fermeture animée aussi. */
+.sheet {
+  translate: 0 100%;
+  transition:
+    translate 0.34s var(--ease-fluid),
+    overlay 0.34s allow-discrete,
+    display 0.34s allow-discrete;
+}
+.sheet[open] {
+  translate: 0 0;
+}
+@starting-style {
+  .sheet[open] {
+    translate: 0 100%;
+  }
+}
+.sheet::backdrop {
+  background: rgb(0 0 0 / 0);
+  backdrop-filter: blur(0);
+  transition:
+    background-color 0.3s,
+    backdrop-filter 0.3s,
+    overlay 0.3s allow-discrete,
+    display 0.3s allow-discrete;
+}
+.sheet[open]::backdrop {
+  background: rgb(0 0 0 / 0.65);
+  backdrop-filter: blur(4px);
+}
+@starting-style {
+  .sheet[open]::backdrop {
+    background: rgb(0 0 0 / 0);
+    backdrop-filter: blur(0);
+  }
+}
+@media (min-width: 640px) {
+  .sheet {
+    translate: 0 0;
+    scale: 0.95;
+    opacity: 0;
+    transition:
+      scale 0.26s var(--ease-fluid),
+      opacity 0.2s ease,
+      overlay 0.26s allow-discrete,
+      display 0.26s allow-discrete;
+  }
+  .sheet[open] {
+    scale: 1;
+    opacity: 1;
+  }
+  @starting-style {
+    .sheet[open] {
+      scale: 0.95;
+      opacity: 0;
+    }
+  }
+}
+
+/* ---------- Toasts (<Toaster>) ---------- */
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(-14px) scale(0.95);
+  }
+}
+@keyframes toast-out {
+  to {
+    opacity: 0;
+    transform: translateY(-10px) scale(0.95);
+  }
+}
+.toast {
+  animation: toast-in 0.32s var(--ease-fluid) backwards;
+}
+.toast[data-leaving] {
+  animation: toast-out 0.22s ease-in forwards;
+}
 
 @utility animate-pop {
   animation: pop 0.5s cubic-bezier(0.2, 0.8, 0.2, 1) backwards;
@@ -163,23 +359,94 @@ input[type="range"] {
   animation: shine 2.4s linear infinite;
 }
 
-/* Transition entre les pages (React <ViewTransition>) : fondu rapide + léger glissement */
+/* ---------- Transitions entre les pages (React <ViewTransition>, sens donné par <NavFeedback>) ---------- */
+/* Les taps traversent l'animation au lieu d'être perdus pendant qu'elle se joue */
+::view-transition {
+  pointer-events: none;
+}
+
+/* Par défaut (redirection, rafraîchissement…) : fondu rapide + légère montée */
 ::view-transition-old(.page) {
-  animation: 120ms ease-out both vt-out;
+  animation: 130ms ease-out both vt-fade-out;
 }
 ::view-transition-new(.page) {
-  animation: 220ms cubic-bezier(0.2, 0.8, 0.2, 1) 60ms both vt-in;
+  animation: 260ms var(--ease-fluid) 50ms both vt-rise;
 }
-@keyframes vt-out {
+
+/* Sens connu : glissement horizontal, marqué vers une page de détail (et retour), léger entre onglets */
+:root[data-nav]::view-transition-old(.page) {
+  animation:
+    150ms ease-in both vt-fade-out,
+    300ms var(--ease-fluid) both vt-slide-out;
+}
+:root[data-nav]::view-transition-new(.page) {
+  animation:
+    220ms ease-out 70ms both vt-fade-in,
+    340ms var(--ease-fluid) both vt-slide-in;
+}
+:root[data-nav="forward"]::view-transition-old(.page) { --vt-to: -48px; }
+:root[data-nav="forward"]::view-transition-new(.page) { --vt-from: 64px; }
+:root[data-nav="back"]::view-transition-old(.page) { --vt-to: 48px; }
+:root[data-nav="back"]::view-transition-new(.page) { --vt-from: -64px; }
+:root[data-nav="right"]::view-transition-old(.page) { --vt-to: -20px; }
+:root[data-nav="right"]::view-transition-new(.page) { --vt-from: 28px; }
+:root[data-nav="left"]::view-transition-old(.page) { --vt-to: 20px; }
+:root[data-nav="left"]::view-transition-new(.page) { --vt-from: -28px; }
+
+/* Retour arrière (bouton, geste) : Next restaure la page sans View Transition, elle glisse donc à l'arrivée */
+:root[data-pop] .stagger {
+  animation:
+    220ms ease-out backwards vt-fade-in,
+    340ms var(--ease-fluid) backwards vt-slide-in;
+}
+:root[data-pop="back"] .stagger { --vt-from: -64px; }
+:root[data-pop="forward"] .stagger { --vt-from: 64px; }
+:root[data-pop="left"] .stagger { --vt-from: -28px; }
+:root[data-pop="right"] .stagger { --vt-from: 28px; }
+
+@keyframes vt-fade-out {
   to {
     opacity: 0;
   }
 }
-@keyframes vt-in {
+@keyframes vt-fade-in {
   from {
     opacity: 0;
-    transform: translateY(6px);
   }
+}
+@keyframes vt-rise {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+@keyframes vt-slide-out {
+  to {
+    translate: var(--vt-to, 0) 0;
+  }
+}
+@keyframes vt-slide-in {
+  from {
+    translate: var(--vt-from, 0) 0;
+  }
+}
+
+/* Barre d'onglets, barre latérale et bouton + restent fixes au-dessus de la page qui glisse */
+::view-transition-group(tabbar),
+::view-transition-group(sidebar),
+::view-transition-group(fab) {
+  animation: none;
+  z-index: 100;
+}
+::view-transition-old(tabbar),
+::view-transition-old(sidebar),
+::view-transition-old(fab) {
+  display: none;
+}
+::view-transition-new(tabbar),
+::view-transition-new(sidebar),
+::view-transition-new(fab) {
+  animation: none;
 }
 
 @media (prefers-reduced-motion: reduce) {
