@@ -14,11 +14,11 @@ import {
 } from "recharts";
 import { CATEGORIES, type Category } from "@/lib/constants";
 
-const AXIS = { stroke: "#8a8984", fontSize: 11, tickLine: false, axisLine: false } as const;
-const SURFACE = "#161618";
+export const AXIS = { stroke: "#8a8984", fontSize: 11, tickLine: false, axisLine: false } as const;
+export const SURFACE = "#161618";
 const CATS = Object.keys(CATEGORIES) as Category[];
 
-function Box({ title, rows }: { title: string; rows: { label: string; value: string; color?: string }[] }) {
+export function Box({ title, rows }: { title: string; rows: { label: string; value: string; color?: string }[] }) {
   return (
     <div className="rounded-xl border border-line bg-surface-2 px-3 py-2 text-xs shadow-xl">
       <div className="mb-1 font-semibold text-ink">{title}</div>
@@ -35,7 +35,8 @@ function Box({ title, rows }: { title: string; rows: { label: string; value: str
 
 export type WeekDatum = { label: string; force: number; cardio: number; mobilite: number; sessions: number };
 
-export function WeeklyChart({ data }: { data: WeekDatum[] }) {
+/** `average` : valeurs = moyenne par semaine (barres mensuelles de la page Évolution) */
+export function WeeklyChart({ data, average = false }: { data: (WeekDatum & { title?: string })[]; average?: boolean }) {
   return (
     <div>
       <div className="mb-3 flex flex-wrap gap-3 text-xs text-ink-2">
@@ -61,14 +62,14 @@ export function WeeklyChart({ data }: { data: WeekDatum[] }) {
               content={({ active, payload, label }: TooltipContentProps) =>
                 active && payload?.length ? (
                   <Box
-                    title={`Semaine du ${label}`}
+                    title={payload[0].payload.title ?? `Semaine du ${label}`}
                     rows={[
                       ...CATS.map((c) => ({
                         label: CATEGORIES[c].label,
                         value: `${payload[0].payload[c]} min`,
                         color: CATEGORIES[c].color,
                       })),
-                      { label: "Séances", value: String(payload[0].payload.sessions) },
+                      { label: average ? "Séances / sem." : "Séances", value: String(payload[0].payload.sessions).replace(".", ",") },
                     ]}
                   />
                 ) : null
