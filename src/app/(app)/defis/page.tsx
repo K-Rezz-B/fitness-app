@@ -9,6 +9,7 @@ import { toggleChallenges } from "@/app/actions";
 import { PageHeader, Progress } from "@/components/ui";
 import { CountUp } from "@/components/count-up";
 import { ProgressLinks } from "@/components/progress-links";
+import { Form, SubmitButton } from "@/components/forms";
 
 export const metadata: Metadata = { title: "Défis" };
 
@@ -39,7 +40,7 @@ export default async function Defis() {
   if (!me.shareChallenges) {
     return (
       <>
-        <PageHeader title="Défis" subtitle="Classement de la semaine entre profils" />
+        <PageHeader title="Défis" back="/workouts" subtitle="Classement de la semaine entre profils" />
         <ProgressLinks current="defis" />
         <section className="glow animate-pop flex flex-col items-center rounded-3xl border border-line px-6 py-12 text-center">
           <div className="text-6xl">🏁</div>
@@ -47,9 +48,9 @@ export default async function Defis() {
           <p className="mt-2 max-w-sm text-sm text-ink-2">
             Chaque semaine, les profils participants sont classés selon l&apos;XP gagnée. Seuls ton prénom, ton emoji, ton nombre de séances, tes minutes et ton XP de la semaine sont visibles : jamais tes séances, ton poids ni tes notes.
           </p>
-          <form action={toggleChallenges} className="mt-6">
-            <button className="btn-primary"><Users size={16} /> Participer aux défis</button>
-          </form>
+          <Form action={toggleChallenges} success="C'est parti, tu participes aux défis 🏁" className="mt-6">
+            <SubmitButton className="btn-primary"><Users size={16} /> Participer aux défis</SubmitButton>
+          </Form>
           <p className="mt-3 flex items-center gap-1 text-xs text-muted"><Lock size={12} /> Tu ne vois le classement que si tu y participes.</p>
         </section>
       </>
@@ -67,7 +68,7 @@ export default async function Defis() {
 
   return (
     <>
-      <PageHeader title="Défis" subtitle={`Semaine du ${fmtDate(ws)} · ${people.length} participant(s)`} />
+      <PageHeader title="Défis" back="/workouts" subtitle={`Semaine du ${fmtDate(ws)} · ${people.length} participant(s)`} />
       <ProgressLinks current="defis" />
 
       {people.length < 2 && (
@@ -140,9 +141,9 @@ export default async function Defis() {
         </section>
       )}
 
-      <form action={toggleChallenges} className="text-center">
-        <button className="text-xs text-muted underline">Ne plus participer aux défis</button>
-      </form>
+      <Form action={toggleChallenges} success="Tu ne participes plus aux défis" className="text-center">
+        <SubmitButton className="inline-flex items-center gap-1.5 text-xs text-muted underline">Ne plus participer aux défis</SubmitButton>
+      </Form>
     </>
   );
 }

@@ -63,7 +63,7 @@ export default async function Bilan({ searchParams }: PageProps<"/bilan">) {
 
   return (
     <>
-      <PageHeader title="Bilan" subtitle={label} />
+      <PageHeader title="Bilan" back="/workouts" subtitle={label} />
       <ProgressLinks current="bilan" />
 
       <div className="mb-4 flex items-center gap-2">

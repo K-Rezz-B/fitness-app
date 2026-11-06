@@ -6,6 +6,7 @@ import { EQUIPMENT, LEVELS, PLANNER_SPORTS } from "@/lib/planner";
 import { hasPlannerPrefs, phaseLabel, prescriptionFor } from "@/lib/coach-plan";
 import { fmtDate } from "@/lib/dates";
 import { regeneratePlan, removeCoachPlan, savePlannerPrefs } from "@/app/coach-actions";
+import { ConfirmButton, Form, SubmitButton } from "@/components/forms";
 
 const Chip = ({ name, value, checked, children }: { name: string; value: string | number; checked: boolean; children: React.ReactNode }) => (
   <label className="cursor-pointer">
@@ -20,7 +21,7 @@ function PlannerForm({ p, submit }: { p: Profile; submit: string }) {
   const sports = new Set(p.planSports);
   const days = new Set(p.planDays);
   return (
-    <form action={savePlannerPrefs} className="space-y-4">
+    <Form action={savePlannerPrefs} success="Programme du coach à jour 🧠" className="space-y-4">
       <p className="text-sm text-ink-2">
         Objectif <b>{GOALS[p.goal as keyof typeof GOALS] ?? p.goal}</b> · <b>{p.weeklySessionsTarget}</b> séances / semaine{" "}
         <Link href="/profile" className="text-accent">(modifiable dans Profil)</Link>
@@ -69,8 +70,8 @@ function PlannerForm({ p, submit }: { p: Profile; submit: string }) {
         <input type="checkbox" name="auto" defaultChecked={p.planAuto} className="mt-0.5 h-4 w-4 accent-[var(--color-accent)]" />
         <span>Adapter automatiquement chaque dimanche soir (progression, semaine de décharge, séances ratées, charge trop élevée)</span>
       </label>
-      <button className="btn-primary w-full sm:w-auto"><Brain size={16} /> {submit}</button>
-    </form>
+      <SubmitButton className="btn-primary w-full sm:w-auto" pendingLabel="Le coach réfléchit…"><Brain size={16} /> {submit}</SubmitButton>
+    </Form>
   );
 }
 
@@ -138,12 +139,12 @@ export function CoachSection({ me, coachPlans, workouts }: { me: Profile; coachP
       </ul>
 
       <div className="mt-4 flex flex-wrap gap-2">
-        <form action={regeneratePlan}>
-          <button className="btn-ghost text-sm"><RefreshCw size={14} /> Régénérer</button>
-        </form>
-        <form action={removeCoachPlan}>
-          <button className="btn-ghost text-sm text-critical">Retirer le programme</button>
-        </form>
+        <Form action={regeneratePlan} success="Programme régénéré 🧠">
+          <SubmitButton className="btn-ghost text-sm" pendingLabel="Régénération…"><RefreshCw size={14} /> Régénérer</SubmitButton>
+        </Form>
+        <Form action={removeCoachPlan} success="Programme retiré">
+          <ConfirmButton className="btn-ghost text-sm text-critical" confirmLabel="Retirer le programme ?">Retirer le programme</ConfirmButton>
+        </Form>
       </div>
       <details className="mt-3">
         <summary className="cursor-pointer text-sm text-muted">Modifier mes disponibilités et préférences</summary>
