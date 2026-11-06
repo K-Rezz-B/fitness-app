@@ -12,6 +12,59 @@ export const workoutXp = (w: Pick<Workout, "durationMin" | "rpe">) => 50 + Math.
 
 export type Stats = ReturnType<typeof computeStats>;
 
+type Scored = Pick<Workout, "durationMin" | "rpe" | "type">;
+
+/**
+ * Score de forme 0-100 au jour `t` (et ses composantes), à partir des séances indexées par jour.
+ * Ne regarde que les jours ≤ t : sert aussi à reconstituer l'historique du score (page Évolution).
+ */
+export function formScore<T extends Scored>(byDay: ReadonlyMap<string, T[]>, weeklyTarget: number, t: string) {
+  const thisWeek = weekStart(t);
+  /** Séances des `n` derniers jours (t inclus), de la plus récente à la plus ancienne */
+  const lastDays = (n: number) => {
+    const out: T[] = [];
+    for (let i = 0; i < n; i++) out.push(...(byDay.get(addDays(t, -i)) ?? []));
+    return out;
+  };
+
+  // --- Série de semaines où l'objectif est atteint ---
+  const sessionsInWeek = (ws: string) => {
+    let n = 0;
+    for (let d = 0; d < 7; d++) n += byDay.get(addDays(ws, d))?.length ?? 0;
+    return n;
+  };
+  let weekStreak = 0;
+  // la semaine en cours compte si déjà validée, sinon on part de la précédente
+  let cursor = sessionsInWeek(thisWeek) >= weeklyTarget ? thisWeek : addDays(thisWeek, -7);
+  while (sessionsInWeek(cursor) >= weeklyTarget && weekStreak < 520) {
+    weekStreak++;
+    cursor = addDays(cursor, -7);
+  }
+
+  // --- Charge aiguë / chronique (ACWR, Gabbett 2016) ---
+  const last7 = lastDays(7);
+  const last28 = lastDays(28);
+  const acute = last7.reduce((s, w) => s + load(w), 0);
+  const chronic = last28.reduce((s, w) => s + load(w), 0) / 4;
+  const acwr = chronic > 0 ? acute / chronic : null;
+
+  // --- Score de forme 0-100 ---
+  const regularite = Math.min(1, last28.length / Math.max(1, weeklyTarget * 4));
+  const who7 = last7.reduce((s, w) => s + whoMinutes(w), 0);
+  const volume = Math.min(1, who7 / 150); // OMS : 150 min/sem modérée
+  const cats14 = new Set(lastDays(14).map((w) => typeInfo(w.type).category));
+  const variete = cats14.size / 3;
+  const serie = Math.min(1, weekStreak / 4);
+  const scoreParts = [
+    { label: "Régularité", value: regularite, weight: 40, hint: `${last28.length}/${weeklyTarget * 4} séances sur 28 j` },
+    { label: "Volume", value: volume, weight: 25, hint: `${who7}/150 min OMS sur 7 j` },
+    { label: "Série", value: serie, weight: 20, hint: `${weekStreak} sem. d'objectif d'affilée` },
+    { label: "Variété", value: variete, weight: 15, hint: `${cats14.size}/3 catégories sur 14 j` },
+  ];
+  const score = Math.round(scoreParts.reduce((s, p) => s + p.value * p.weight, 0));
+  return { score, scoreParts, weekStreak, acute, chronic, acwr, who7, last7 };
+}
+
 export function computeStats(all: Workout[], weeklyTarget: number) {
   const t = today();
   const thisWeek = weekStart(t);
@@ -43,20 +96,6 @@ export function computeStats(all: Workout[], weeklyTarget: number) {
   }
   const current = weeks[weeks.length - 1];
 
-  // --- Série de semaines où l'objectif est atteint ---
-  const sessionsInWeek = (ws: string) => {
-    let n = 0;
-    for (let d = 0; d < 7; d++) n += byDay.get(addDays(ws, d))?.length ?? 0;
-    return n;
-  };
-  let weekStreak = 0;
-  // la semaine en cours compte si déjà validée, sinon on part de la précédente
-  let cursor = sessionsInWeek(thisWeek) >= weeklyTarget ? thisWeek : addDays(thisWeek, -7);
-  while (sessionsInWeek(cursor) >= weeklyTarget && weekStreak < 520) {
-    weekStreak++;
-    cursor = addDays(cursor, -7);
-  }
-
   // --- Série de jours actifs (tolère aujourd'hui non encore fait) ---
   let dayStreak = 0;
   let d = byDay.has(t) ? t : addDays(t, -1);
@@ -65,27 +104,8 @@ export function computeStats(all: Workout[], weeklyTarget: number) {
     d = addDays(d, -1);
   }
 
-  // --- Charge aiguë / chronique (ACWR, Gabbett 2016) ---
-  const last7 = inRange(addDays(t, -6));
-  const last28 = inRange(addDays(t, -27));
-  const acute = last7.reduce((s, w) => s + load(w), 0);
-  const chronic = last28.reduce((s, w) => s + load(w), 0) / 4;
-  const acwr = chronic > 0 ? acute / chronic : null;
-
-  // --- Score de forme 0-100 ---
-  const regularite = Math.min(1, last28.length / Math.max(1, weeklyTarget * 4));
-  const who7 = last7.reduce((s, w) => s + whoMinutes(w), 0);
-  const volume = Math.min(1, who7 / 150); // OMS : 150 min/sem modérée
-  const cats14 = new Set(inRange(addDays(t, -13)).map((w) => typeInfo(w.type).category));
-  const variete = cats14.size / 3;
-  const serie = Math.min(1, weekStreak / 4);
-  const scoreParts = [
-    { label: "Régularité", value: regularite, weight: 40, hint: `${last28.length}/${weeklyTarget * 4} séances sur 28 j` },
-    { label: "Volume", value: volume, weight: 25, hint: `${who7}/150 min OMS sur 7 j` },
-    { label: "Série", value: serie, weight: 20, hint: `${weekStreak} sem. d'objectif d'affilée` },
-    { label: "Variété", value: variete, weight: 15, hint: `${cats14.size}/3 catégories sur 14 j` },
-  ];
-  const score = Math.round(scoreParts.reduce((s, p) => s + p.value * p.weight, 0));
+  // --- Score de forme, série de semaines, charge aiguë / chronique ---
+  const { score, scoreParts, weekStreak, acute, chronic, acwr, who7, last7 } = formScore(byDay, weeklyTarget, t);
 
   // --- XP & niveaux ---
   const xp = all.reduce((s, w) => s + workoutXp(w), 0);

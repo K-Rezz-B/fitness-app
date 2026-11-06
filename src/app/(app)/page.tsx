@@ -213,7 +213,10 @@ export default async function Dashboard({ searchParams }: PageProps<"/">) {
 
         {/* Graph semaines */}
         <section className="card lg:col-span-3">
-          <div className="mb-3 text-sm font-semibold">Minutes par semaine</div>
+          <div className="mb-3 flex items-baseline justify-between gap-2 text-sm font-semibold">
+            Minutes par semaine
+            <Link href="/evolution" className="text-xs font-medium text-accent">Mon évolution →</Link>
+          </div>
           <WeeklyChart data={weekData} />
         </section>
       </div>

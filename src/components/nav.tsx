@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, Dumbbell, CalendarClock, PlaySquare, Brain, Plus, UserRound, ArrowLeftRight, Apple, Trophy } from "lucide-react";
+import { Home, Dumbbell, CalendarClock, PlaySquare, Brain, Plus, UserRound, ArrowLeftRight, Apple, Trophy, ChartLine } from "lucide-react";
 import clsx from "clsx";
 
 const ITEMS = [
@@ -26,7 +26,13 @@ export function Sidebar({ profile }: { profile: { name: string; emoji: string } 
         <Plus size={18} /> Nouvelle séance
       </Link>
       <nav className="flex flex-col gap-1">
-        {[...ITEMS, { href: "/progress", label: "Progrès", icon: Trophy }, { href: "/integrations", label: "Apple", icon: Apple }, { href: "/profile", label: "Profil", icon: UserRound }].map(({ href, label, icon: Icon }) => (
+        {[
+          ...ITEMS,
+          { href: "/progress", label: "Progrès", icon: Trophy },
+          { href: "/evolution", label: "Évolution", icon: ChartLine },
+          { href: "/integrations", label: "Apple", icon: Apple },
+          { href: "/profile", label: "Profil", icon: UserRound },
+        ].map(({ href, label, icon: Icon }) => (
           <Link
             key={href}
             href={href}
@@ -57,8 +63,8 @@ export function Sidebar({ profile }: { profile: { name: string; emoji: string } 
 }
 
 export function TabBar() {
-  // Records, bilan et défis sont rangés sous l'onglet Séances sur mobile
-  const path = usePathname().replace(/^\/(progress|bilan|defis)\b.*/, "/workouts");
+  // Records, bilan, défis et évolution sont rangés sous l'onglet Séances sur mobile
+  const path = usePathname().replace(/^\/(progress|bilan|defis|evolution)\b.*/, "/workouts");
   const current = ITEMS.findIndex((i) => active(path, i.href));
   return (
     <nav className="pb-safe fixed inset-x-0 bottom-0 z-40 border-t border-line bg-bg/85 backdrop-blur-xl md:hidden">

@@ -34,6 +34,14 @@ export async function countThisWeek(pid: number) {
   return rows.filter((r) => dayKey(r.date) >= ws).length;
 }
 
+/** Activité quotidienne depuis `from` inclus (tout l'historique si null), du plus ancien au plus récent */
+export const getActivitySince = (pid: number, from: string | null) =>
+  db
+    .select()
+    .from(dailyActivity)
+    .where(from ? and(eq(dailyActivity.profileId, pid), gte(dailyActivity.date, from)) : eq(dailyActivity.profileId, pid))
+    .orderBy(asc(dailyActivity.date));
+
 /** Activité quotidienne (app Forme) des `days` derniers jours, du plus récent au plus ancien */
 export const getActivity = (pid: number, days = 30) =>
   db
