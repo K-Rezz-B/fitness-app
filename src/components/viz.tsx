@@ -48,7 +48,7 @@ export function ScoreRing({ score, size = 148 }: { score: number; size?: number 
 }
 
 /** Heatmap d'activité (rampe séquentielle bleue, une seule teinte) */
-const STEPS = ["#1f1f22", "#184f95", "#256abf", "#3987e5", "#86b6ef"];
+export const STEPS = ["#1f1f22", "#184f95", "#256abf", "#3987e5", "#86b6ef"];
 const step = (m: number) => (m === 0 ? 0 : m < 30 ? 1 : m < 60 ? 2 : m < 90 ? 3 : 4);
 
 export function Heatmap({ days, todayKey }: { days: { day: string; minutes: number; count: number }[]; todayKey: string }) {

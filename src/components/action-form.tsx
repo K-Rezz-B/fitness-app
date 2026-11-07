@@ -1,6 +1,7 @@
 "use client";
 import { useActionState, useRef, type ReactNode, type Ref } from "react";
 import clsx from "clsx";
+import { Spinner } from "./forms";
 
 /** Retour d'une server action de formulaire : message d'erreur ou de confirmation (null = rien à afficher). */
 export type FormState = { ok: boolean; message: string } | null;
@@ -26,12 +27,18 @@ export function ActionForm({
     <form action={formAction} className={clsx("space-y-4", className)}>
       {children}
       {state && (
-        <p role="status" className={clsx("text-sm", state.ok ? "text-accent" : "text-critical")}>
+        <p role="status" className={clsx("animate-fade-up text-sm", state.ok ? "text-accent" : "text-critical")}>
           {state.message}
         </p>
       )}
-      <button className={danger ? "btn-ghost text-critical" : "btn-primary w-full"} disabled={pending}>
-        {pending ? pendingLabel : submit}
+      <button className={danger ? "btn-ghost text-critical" : "btn-primary w-full"} disabled={pending} aria-busy={pending}>
+        {pending ? (
+          <>
+            <Spinner /> {pendingLabel}
+          </>
+        ) : (
+          submit
+        )}
       </button>
     </form>
   );

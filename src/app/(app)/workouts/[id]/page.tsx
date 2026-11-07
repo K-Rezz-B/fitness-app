@@ -1,9 +1,11 @@
 import { notFound } from "next/navigation";
+import { Trash2 } from "lucide-react";
 import { getWeights, getVideos, getWorkout, getWorkouts } from "@/lib/data";
 import { exerciseIndex, exerciseMemos } from "@/lib/records";
 import { requireProfile } from "@/lib/session";
 import { PageHeader } from "@/components/ui";
 import { WorkoutForm } from "@/components/workout-form";
+import { ConfirmButton, Form } from "@/components/forms";
 import { deleteWorkout } from "@/app/actions";
 
 export default async function EditWorkout({ params }: PageProps<"/workouts/[id]">) {
@@ -16,11 +18,14 @@ export default async function EditWorkout({ params }: PageProps<"/workouts/[id]"
     <>
       <PageHeader
         title="Modifier la séance"
+        back="/workouts"
         action={
-          <form action={deleteWorkout}>
+          <Form action={deleteWorkout} success="Séance supprimée">
             <input type="hidden" name="id" value={w.id} />
-            <button className="btn-ghost text-critical">Supprimer</button>
-          </form>
+            <ConfirmButton className="btn-ghost text-critical">
+              <Trash2 size={16} /> Supprimer
+            </ConfirmButton>
+          </Form>
         }
       />
       <WorkoutForm initial={{ ...w, date: w.date.toISOString() }} videos={videos.map((v) => ({ id: v.id, title: v.title }))} weightKg={ws[0]?.weightKg} pid={pid} memos={memos} />

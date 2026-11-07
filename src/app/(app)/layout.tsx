@@ -1,7 +1,11 @@
+import { Suspense } from "react";
 import { Sidebar, TabBar, Fab } from "@/components/nav";
 import { AppBadge } from "@/components/app-badge";
 import { PageTransition } from "@/components/page-transition";
 import { OutboxSync } from "@/components/outbox-sync";
+import { NavFeedback } from "@/components/nav-feedback";
+import { Toaster } from "@/components/toaster";
+import { PullToRefresh } from "@/components/pull-to-refresh";
 import { requireProfile } from "@/lib/session";
 import { countThisWeek } from "@/lib/data";
 
@@ -18,6 +22,11 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
       <TabBar />
       <AppBadge count={remaining} />
       <OutboxSync pid={me.id} />
+      <Toaster />
+      <PullToRefresh />
+      <Suspense fallback={null}>
+        <NavFeedback />
+      </Suspense>
     </div>
   );
 }

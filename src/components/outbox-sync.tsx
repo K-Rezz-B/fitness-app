@@ -1,15 +1,15 @@
 "use client";
-import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useRef, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
 import { CloudOff, CloudUpload } from "lucide-react";
 import { syncOfflineWorkout } from "@/app/actions";
 import { readOutbox, removeFromOutbox, subscribeOutbox } from "@/lib/outbox";
+import { toast } from "./toaster";
 
 /** Envoie les séances saisies hors-ligne dès que le réseau revient, et affiche ce qui reste en attente. */
 export function OutboxSync({ pid }: { pid: number }) {
   const router = useRouter();
   const pending = useSyncExternalStore(subscribeOutbox, () => readOutbox().filter((p) => p.pid === pid).length, () => 0);
-  const [toast, setToast] = useState<string | null>(null);
   const busy = useRef(false);
 
   const flush = useCallback(async () => {
@@ -31,9 +31,8 @@ export function OutboxSync({ pid }: { pid: number }) {
       busy.current = false;
     }
     if (sent) {
-      setToast(`☁️ ${sent} séance${sent > 1 ? "s" : ""} hors-ligne synchronisée${sent > 1 ? "s" : ""}`);
+      toast(`☁️ ${sent} séance${sent > 1 ? "s" : ""} hors-ligne synchronisée${sent > 1 ? "s" : ""}`, { duration: 4000 });
       router.refresh();
-      setTimeout(() => setToast(null), 4000);
     }
   }, [pid, router]);
 
@@ -47,7 +46,7 @@ export function OutboxSync({ pid }: { pid: number }) {
     };
   }, [flush]);
 
-  if (!toast && !pending) return null;
+  if (!pending) return null;
   return (
     <div className="pointer-events-none fixed inset-x-0 top-0 z-50 flex justify-center pt-[calc(env(safe-area-inset-top)+0.75rem)]">
       <button
@@ -55,12 +54,8 @@ export function OutboxSync({ pid }: { pid: number }) {
         onClick={flush}
         className="animate-fade-up pointer-events-auto flex items-center gap-2 rounded-full border border-line bg-surface-2/95 px-4 py-2 text-xs font-medium text-ink shadow-xl backdrop-blur"
       >
-        {toast ?? (
-          <>
-            {navigator.onLine ? <CloudUpload size={14} className="text-accent" /> : <CloudOff size={14} className="text-warning" />}
-            {pending} séance{pending > 1 ? "s" : ""} en attente d&apos;envoi
-          </>
-        )}
+        {navigator.onLine ? <CloudUpload size={14} className="text-accent" /> : <CloudOff size={14} className="text-warning" />}
+        {pending} séance{pending > 1 ? "s" : ""} en attente d&apos;envoi
       </button>
     </div>
   );

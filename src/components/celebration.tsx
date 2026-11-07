@@ -1,8 +1,8 @@
 "use client";
 import { useEffect, useState } from "react";
-import { X } from "lucide-react";
 import type { NewRecord } from "@/lib/records";
 import { buzz, confetti } from "./confetti";
+import { Sheet } from "./sheet";
 
 const nf = new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 1 });
 const KIND = { charge: "charge max", "1RM": "1RM estimé", reps: "reps" } as const;
@@ -36,12 +36,9 @@ export function Celebration({
         ✅ Séance enregistrée ! <b className="font-mono">+{xp} XP</b> — continue comme ça.
       </div>
 
-      {open && (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 p-4 backdrop-blur-sm sm:items-center" onClick={() => setOpen(false)} role="dialog" aria-modal aria-label="Bravo">
-          <div className="animate-pop glow relative w-full max-w-sm rounded-3xl border border-line p-6 text-center" onClick={(e) => e.stopPropagation()}>
-            <button type="button" onClick={() => setOpen(false)} aria-label="Fermer" className="absolute top-3 right-3 text-muted">
-              <X size={20} />
-            </button>
+      {big && (
+        <Sheet open={open} onClose={() => setOpen(false)} className="glow" narrow>
+          <div className="pb-4 text-center sm:pt-1">
 
             {level ? (
               <>
@@ -86,11 +83,11 @@ export function Celebration({
               </div>
             )}
 
-            <button type="button" onClick={() => setOpen(false)} className="btn-primary mt-6 w-full">
+            <button type="button" onClick={() => setOpen(false)} autoFocus className="btn-primary mt-6 w-full">
               Trop bien 💪
             </button>
           </div>
-        </div>
+        </Sheet>
       )}
     </>
   );

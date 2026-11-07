@@ -1,6 +1,7 @@
 "use client";
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
-import { Check, History, Play, Plus, RotateCcw, Trash2, X } from "lucide-react";
+import { Check, History, Play, Plus, RotateCcw, Trash2, Undo2, X } from "lucide-react";
+import { useFormStatus } from "react-dom";
 import clsx from "clsx";
 import { WORKOUT_TYPES, typeInfo, CATEGORIES } from "@/lib/constants";
 import type { Exercise, ExerciseSet, Workout } from "@/lib/schema";
@@ -12,6 +13,8 @@ import { fmtDate } from "@/lib/dates";
 import { CoachVideo } from "./coach-video";
 import { LiveBar, RestTimer, clearDraft, draftSnapshot, parseDraft, readDraft, subscribeDraft, unlockAudio, writeDraft, type LiveDraft } from "./live-session";
 import { buzz, confetti } from "./confetti";
+import { Spinner } from "./forms";
+import { toast } from "./toaster";
 
 type Initial = Partial<Pick<Workout, "id" | "type" | "title" | "durationMin" | "rpe" | "distanceKm" | "calories" | "notes" | "videoId" | "exercises">> & { date?: string };
 /** Dernière séance de chaque type, pour « refaire ma dernière séance ». */
@@ -36,6 +39,25 @@ const restUntil = (sec: number) => Date.now() + sec * 1000;
 
 /** Séries de la dernière fois, sans les cases cochées. */
 const copySets = (sets: ExerciseSet[]): FormSet[] => sets.map((s) => ({ reps: s.reps, weight: s.weight }));
+
+/** Saisie au pouce : tout le contenu est sélectionné au toucher, on tape directement la nouvelle valeur. */
+const selectAll = (e: { currentTarget: HTMLInputElement }) => e.currentTarget.select();
+
+/** Bouton d'enregistrement : indicateur pendant l'envoi, impossible d'enregistrer deux fois. */
+function SaveButton({ children, onClick }: { children: React.ReactNode; onClick?: () => void }) {
+  const { pending } = useFormStatus();
+  return (
+    <button type={onClick ? "button" : "submit"} onClick={onClick} disabled={pending} aria-busy={pending} className="btn-primary w-full py-3.5 text-base">
+      {pending ? (
+        <>
+          <Spinner size={18} /> Enregistrement…
+        </>
+      ) : (
+        children
+      )}
+    </button>
+  );
+}
 
 export function WorkoutForm({
   initial,
@@ -68,6 +90,14 @@ export function WorkoutForm({
   const [local, setLocal] = useState(() => toLocalInput(initial.date ? new Date(initial.date) : new Date()));
   const [exercises, setExercises] = useState<FormExercise[]>(initial.exercises ?? []);
   const [offlineSaved, setOfflineSaved] = useState(false);
+  // Exercice tout juste ajouté (son nom prend le focus) et dernier supprimé (annulable quelques secondes)
+  const [focusIdx, setFocusIdx] = useState<number | null>(null);
+  const [removed, setRemoved] = useState<{ ex: FormExercise; i: number } | null>(null);
+  useEffect(() => {
+    if (!removed) return;
+    const t = setTimeout(() => setRemoved(null), 6000);
+    return () => clearTimeout(t);
+  }, [removed]);
   const info = typeInfo(type);
   const iso = useMemo(() => (local ? new Date(local).toISOString() : ""), [local]);
   const last = isNew ? lastByType[type] : undefined;
@@ -125,6 +155,21 @@ export function WorkoutForm({
   const endRest = useCallback(() => setRest(null), []);
 
   const update = (i: number, fn: (e: FormExercise) => FormExercise) => setExercises((xs) => xs.map((e, j) => (j === i ? fn(e) : e)));
+  const addExercise = () => {
+    setFocusIdx(exercises.length);
+    setExercises((x) => [...x, { name: "", sets: [{}] }]);
+  };
+  const removeExercise = (i: number) => {
+    const ex = exercises[i];
+    if (ex.name.trim() || ex.sets.some((s) => s.reps != null || s.weight != null)) setRemoved({ ex, i });
+    setFocusIdx(null);
+    setExercises((xs) => xs.filter((_, j) => j !== i));
+  };
+  const undoRemove = () => {
+    if (!removed) return;
+    setExercises((xs) => [...xs.slice(0, removed.i), removed.ex, ...xs.slice(removed.i)]);
+    setRemoved(null);
+  };
   const updateSet = (i: number, k: number, patch: Partial<FormSet>) => update(i, (x) => ({ ...x, sets: x.sets.map((y, m) => (m === k ? { ...y, ...patch } : y)) }));
 
   const toggleDone = (i: number, k: number) => {
@@ -145,6 +190,7 @@ export function WorkoutForm({
     setRpe(last.rpe);
     setExercises(last.exercises.map((e) => ({ name: e.name, sets: copySets(e.sets) })));
     buzz(15);
+    toast("Dernière séance reprise : ajuste et c'est parti", { kind: "info" });
   };
 
   const totalSets = exercises.reduce((n, e) => n + e.sets.length, 0);
@@ -274,10 +320,10 @@ export function WorkoutForm({
             </div>
             <div>
               <label className="label" htmlFor="durationMin">Durée (min)</label>
-              <input id="durationMin" name="durationMin" type="number" inputMode="numeric" min={1} max={1440} value={duration} onChange={(e) => setDuration(Number(e.target.value))} className="input" required />
+              <input id="durationMin" name="durationMin" type="number" inputMode="numeric" min={1} max={1440} value={duration} onFocus={selectAll} onChange={(e) => setDuration(Number(e.target.value))} className="input" required />
               <div className="mt-2 flex gap-1.5">
                 {[20, 30, 45, 60, 90].map((m) => (
-                  <button type="button" key={m} onClick={() => setDuration(m)} className={clsx("chip transition", duration === m && "border-accent text-accent")}>{m}</button>
+                  <button type="button" key={m} onClick={() => setDuration(m)} className={clsx("chip transition active:scale-95", duration === m && "border-accent text-accent")}>{m}</button>
                 ))}
               </div>
             </div>
@@ -313,10 +359,18 @@ export function WorkoutForm({
       <section className="card">
         <div className="mb-3 flex items-center justify-between">
           <div className="label mb-0">Exercices</div>
-          <button type="button" className="btn-ghost px-3 py-1.5 text-xs" onClick={() => setExercises((x) => [...x, { name: "", sets: [{}] }])}>
+          <button type="button" className="btn-ghost px-3 py-1.5 text-xs" onClick={addExercise}>
             <Plus size={14} /> Exercice
           </button>
         </div>
+        {removed && (
+          <div role="status" className="animate-fade-up mb-3 flex items-center gap-2 rounded-2xl border border-line bg-surface-2 px-3 py-2 text-sm">
+            <span className="min-w-0 flex-1 truncate text-ink-2">« {removed.ex.name || "Exercice"} » supprimé</span>
+            <button type="button" onClick={undoRemove} className="flex shrink-0 items-center gap-1 font-semibold text-accent active:scale-95">
+              <Undo2 size={14} /> Annuler
+            </button>
+          </div>
+        )}
         {exercises.length === 0 && (
           <p className="text-sm text-muted">
             Optionnel : détaille séries, reps et charges pour suivre ta progression{known ? " et battre tes records 🏆" : ""}.
@@ -328,8 +382,8 @@ export function WorkoutForm({
             return (
               <div key={i} className="animate-fade-up rounded-2xl border border-line bg-surface-2 p-3">
                 <div className="flex gap-2">
-                  <input value={ex.name} list="exercise-names" onChange={(e) => update(i, (x) => ({ ...x, name: e.target.value }))} placeholder="Nom de l'exercice" className="input bg-surface" />
-                  <button type="button" aria-label="Supprimer" onClick={() => setExercises((xs) => xs.filter((_, j) => j !== i))} className="btn-ghost px-3">
+                  <input value={ex.name} list="exercise-names" autoFocus={i === focusIdx} enterKeyHint="next" onChange={(e) => update(i, (x) => ({ ...x, name: e.target.value }))} placeholder="Nom de l'exercice" className="input bg-surface" />
+                  <button type="button" aria-label="Supprimer l'exercice" onClick={() => removeExercise(i)} className="btn-ghost px-3">
                     <Trash2 size={16} />
                   </button>
                 </div>
@@ -348,7 +402,7 @@ export function WorkoutForm({
                   {ex.sets.map((s, k) => {
                     const pr = isRecordSet(memo, s);
                     return (
-                      <div key={k} className={clsx("flex items-center gap-2 rounded-xl text-sm transition-colors", s.done && "bg-accent/5")}>
+                      <div key={k} className={clsx("animate-fade-up flex items-center gap-2 rounded-xl text-sm transition-colors", s.done && "bg-accent/5")}>
                         {live ? (
                           <button
                             type="button"
@@ -365,17 +419,17 @@ export function WorkoutForm({
                         ) : (
                           <span className="w-8 font-mono text-xs text-muted">S{k + 1}</span>
                         )}
-                        <input type="number" inputMode="numeric" value={s.reps ?? ""} placeholder="reps" onChange={(e) => updateSet(i, k, { reps: e.target.value === "" ? undefined : Number(e.target.value) })} className="input bg-surface py-1.5" />
-                        <input type="number" inputMode="decimal" step="0.5" value={s.weight ?? ""} placeholder="kg" onChange={(e) => updateSet(i, k, { weight: e.target.value === "" ? undefined : Number(e.target.value) })} className="input bg-surface py-1.5" />
+                        <input type="number" inputMode="numeric" value={s.reps ?? ""} placeholder="reps" aria-label={`Répétitions série ${k + 1}`} onFocus={selectAll} onChange={(e) => updateSet(i, k, { reps: e.target.value === "" ? undefined : Number(e.target.value) })} className="input bg-surface py-1.5" />
+                        <input type="number" inputMode="decimal" step="0.5" value={s.weight ?? ""} placeholder="kg" aria-label={`Charge série ${k + 1} (kg)`} onFocus={selectAll} onChange={(e) => updateSet(i, k, { weight: e.target.value === "" ? undefined : Number(e.target.value) })} className="input bg-surface py-1.5" />
                         {pr ? (
                           <span key="pr" className="animate-pop shrink-0 rounded-lg bg-warning/15 px-1.5 py-1 text-[10px] font-bold text-warning" title="Nouveau record">🏆 PR</span>
                         ) : (
-                          <button type="button" aria-label="Retirer la série" onClick={() => update(i, (x) => ({ ...x, sets: x.sets.filter((_, m) => m !== k) }))} className="text-muted"><X size={16} /></button>
+                          <button type="button" aria-label="Retirer la série" onClick={() => update(i, (x) => ({ ...x, sets: x.sets.filter((_, m) => m !== k) }))} className="-m-1 p-1 text-muted transition active:scale-75"><X size={16} /></button>
                         )}
                       </div>
                     );
                   })}
-                  <button type="button" onClick={() => update(i, (x) => ({ ...x, sets: [...x.sets, { reps: x.sets.at(-1)?.reps, weight: x.sets.at(-1)?.weight }] }))} className="text-xs font-medium text-accent">+ série</button>
+                  <button type="button" onClick={() => update(i, (x) => ({ ...x, sets: [...x.sets, { reps: x.sets.at(-1)?.reps, weight: x.sets.at(-1)?.weight }] }))} className="rounded-lg py-1 pr-2 text-xs font-medium text-accent transition active:scale-95">+ série</button>
                 </div>
               </div>
             );
@@ -389,9 +443,9 @@ export function WorkoutForm({
       </section>
 
       {live ? (
-        <button type="button" onClick={finishLive} className="btn-primary w-full py-3.5 text-base">Terminer et enregistrer 🏁</button>
+        <SaveButton onClick={finishLive}>Terminer et enregistrer 🏁</SaveButton>
       ) : (
-        <button className="btn-primary w-full py-3.5 text-base">{initial.id ? "Mettre à jour" : "Enregistrer la séance 💪"}</button>
+        <SaveButton>{initial.id ? "Mettre à jour" : "Enregistrer la séance 💪"}</SaveButton>
       )}
 
       {rest && <RestTimer endsAt={rest.endsAt} total={rest.total} onChange={(endsAt, total) => setRest({ endsAt, total })} onDone={endRest} />}

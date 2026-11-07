@@ -48,7 +48,7 @@ export default async function NewWorkout({ searchParams }: PageProps<"/workouts/
     lastByType[w.type] ??= { title: w.title, durationMin: w.durationMin, rpe: w.rpe, exercises: w.exercises, date: w.date.toISOString() };
   return (
     <>
-      <PageHeader title="Nouvelle séance" subtitle={plan ? `🧠 Prévue par ton coach · ${plan.notes ?? ""}` : "Chaque séance loggée = XP + score 📈"} />
+      <PageHeader title="Nouvelle séance" back="/workouts" subtitle={plan ? `🧠 Prévue par ton coach · ${plan.notes ?? ""}` : "Chaque séance loggée = XP + score 📈"} />
       {!plan && <TemplatePicker current={tpl?.id} doable={templatesForProfile(me).list} showAll={one(sp.all) === "1"} />}
       <WorkoutForm key={plan ? `plan-${plan.id}` : (tpl?.id ?? type ?? "blank")} initial={initial} videos={videos.map((v) => ({ id: v.id, title: v.title }))} weightKg={ws[0]?.weightKg} coach={coach} pid={pid} memos={memos} lastByType={lastByType} autoLive={one(sp.live) === "1"} />
     </>
