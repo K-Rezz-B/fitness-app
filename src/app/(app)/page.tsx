@@ -1,12 +1,14 @@
 import Link from "next/link";
-import { Flame, Trophy, Timer, Target, Sparkles, CalendarCheck2 } from "lucide-react";
-import { getActivity, getPlans, getVideos, getWorkouts } from "@/lib/data";
+import { Flame, Trophy, Timer, Target, Sparkles, CalendarDays, CalendarPlus, CalendarX2, ChevronRight, Clock } from "lucide-react";
+import { getActivity, getPlanMoves, getPlans, getVideos, getWorkouts } from "@/lib/data";
 import { requireProfile } from "@/lib/session";
 import { computeStats } from "@/lib/stats";
 import { suggest, templateById } from "@/lib/templates";
 import { WEEKDAYS, typeInfo } from "@/lib/constants";
-import { addDays, dayKey, fmtDate, fmtTime, isoWeekday, today } from "@/lib/dates";
-import { templatesForProfile, upcomingPlan } from "@/lib/coach-plan";
+import { addDays, dayKey, diffDays, fmtDate, fmtTime, isoWeekday, today, weekStart } from "@/lib/dates";
+import { templatesForProfile } from "@/lib/coach-plan";
+import { dayLabel, nextSession, sessionHref, sessionsBetween, type Session } from "@/lib/schedule";
+import { MoveSession } from "@/components/move-session";
 import { coachVideosFor } from "@/lib/video-coach";
 import { CoachVideo } from "@/components/coach-video";
 import { PageHeader, Progress, Stat } from "@/components/ui";
@@ -27,6 +29,8 @@ const QUOTES = [
   "Pas besoin d'être extrême, juste constant.",
 ];
 
+const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+
 /** Records passés dans l'URL par saveWorkout (on ne garde que des valeurs bien formées). */
 function parseRecords(raw: string | string[] | undefined): NewRecord[] {
   try {
@@ -41,43 +45,39 @@ function parseRecords(raw: string | string[] | undefined): NewRecord[] {
 
 export default async function Dashboard({ searchParams }: PageProps<"/">) {
   const profile = await requireProfile();
-  const [all, videos, plans, activity, sp] = await Promise.all([getWorkouts(profile.id), getVideos(profile.id), getPlans(profile.id), getActivity(profile.id, 7), searchParams]);
+  const [all, videos, plans, moves, activity, sp] = await Promise.all([
+    getWorkouts(profile.id), getVideos(profile.id), getPlans(profile.id), getPlanMoves(profile.id), getActivity(profile.id, 7), searchParams,
+  ]);
   const target = profile.weeklySessionsTarget;
   const s = computeStats(all, target);
   const t = today();
-  const planHref = (p: (typeof plans)[number]) =>
-    p.source === "coach" && p.templateId ? `/workouts/new?plan=${p.id}` : `/workouts/new?type=${p.type}&title=${encodeURIComponent(p.title)}&duration=${p.durationMin}`;
-  const wd = isoWeekday(t);
-  const todayPlans = plans.filter((p) => p.active && p.weekday === wd);
+  const now = fmtTime(new Date());
+  const ws = weekStart(t);
   const doneToday = all.filter((w) => dayKey(w.date) === t);
 
-  // ---- Carte du jour : séance du coach > jour de récup du programme > suggestion faisable avec ton matériel ----
-  const coachPlans = plans.filter((p) => p.source === "coach" && p.active);
-  const coachToday = todayPlans.find(
-    (p) => p.source === "coach" && p.templateId && !doneToday.some((w) => typeInfo(w.type).category === typeInfo(p.type).category),
-  );
-  const coachTpl = coachToday ? templateById(coachToday.templateId!) : undefined;
-  const restDay = !coachTpl && coachPlans.length > 0; // programme actif mais rien (ou plus rien) à faire aujourd'hui
-  const next = restDay ? upcomingPlan(coachPlans, wd, fmtTime(new Date())) : undefined;
-  const nextLabel = next
-    ? `${next.inDays === 0 ? "aujourd'hui" : next.inDays === 1 ? "demain" : WEEKDAYS[next.plan.weekday - 1].toLowerCase()} ${next.plan.time} · ${next.plan.title}`
-    : null;
+  // ---- Agenda : 7 derniers jours (séances manquées) + semaine en cours + 14 prochains jours ----
+  const sessions = sessionsBetween(plans, moves, all, addDays(t, -7) < ws ? addDays(t, -7) : ws, addDays(t, 14));
+  const missed = sessions.filter((x) => !x.done && x.date < t && x.date >= addDays(t, -7)).reverse();
+  const hero = sessions.find((x) => x.date === t && !x.done) ?? nextSession(sessions, t, now);
+  const heroToday = hero?.date === t;
+  const upcoming = sessions.filter((x) => !x.done && x.date >= t && x !== hero).slice(0, 6);
+  const week = Array.from({ length: 7 }, (_, i) => addDays(ws, i)).map((date) => {
+    const planned = sessions.filter((x) => x.date === date);
+    const logged = all.filter((w) => dayKey(w.date) === date);
+    return { date, planned, extra: Math.max(0, logged.length - planned.filter((x) => x.done).length) };
+  });
+  const mv = (x: Session) => ({ planId: x.planId, moveId: x.moveId, date: x.date, time: x.time, title: x.title, emoji: typeInfo(x.type).emoji });
+
+  // ---- Sans séance prévue : suggestion faisable avec ton matériel ----
   const { list: doable, known: equipmentKnown } = templatesForProfile(profile);
   const suggested = suggest(all.slice(0, 20), target, doable);
-  const template = coachTpl ?? (restDay ? templateById("mobility")! : suggested.template);
-  const cardTitle = coachTpl ? "Séance du jour · coach" : restDay ? (doneToday.length ? "Séance du jour faite ✅" : "Jour de récupération 😌") : "Séance suggérée";
-  const reason = coachTpl
-    ? `Prévue aujourd'hui par ton coach (${coachToday!.time}) · ${coachToday!.notes ?? ""}`
-    : restDay
-      ? `${doneToday.length ? "Bien joué ! " : "Ton coach n'a rien prévu aujourd'hui : la récupération fait partie du programme. "}${nextLabel ? `Prochaine séance : ${nextLabel}. ` : ""}Une mobilité douce reste possible si tu en as envie.`
-      : suggested.reason;
-  const startHref = coachToday && coachTpl ? `/workouts/new?plan=${coachToday.id}` : `/workouts/new?template=${template.id}`;
-  // Vidéo du coach : piochée parmi les vidéos du thème de la séance (tags)
+  const heroTpl = hero?.templateId ? templateById(hero.templateId) : undefined;
+  const template = hero ? heroTpl : suggested.template;
   const coachVideo = coachVideosFor({
     library: videos,
-    session: coachToday && coachTpl
-      ? { templateId: coachToday.templateId, type: coachToday.type, durationMin: coachToday.durationMin }
-      : { templateId: template.id, type: template.type, durationMin: template.durationMin },
+    session: hero
+      ? { templateId: hero.templateId, type: hero.type, durationMin: hero.durationMin }
+      : { templateId: suggested.template.id, type: suggested.template.type, durationMin: suggested.template.durationMin },
     profile,
     workouts: all,
     day: t,
@@ -106,11 +106,181 @@ export default async function Dashboard({ searchParams }: PageProps<"/">) {
         />
       )}
 
-      {/* HERO */}
-      <section className="glow mb-4 rounded-3xl border border-line p-5 sm:p-6">
+      {/* Séances manquées : à décaler ou à sauter */}
+      {missed.length > 0 && (
+        <section className="card mb-4 border-warning/40">
+          <div className="mb-3 flex items-center gap-2 text-sm font-semibold">
+            <CalendarX2 size={16} className="text-warning" /> {missed.length > 1 ? `${missed.length} séances manquées` : "Séance manquée"}
+            <span className="font-normal text-muted">· pas grave, on la recale ?</span>
+          </div>
+          <ul className="space-y-2">
+            {missed.map((x) => (
+              <li key={x.key} className="flex items-center justify-between gap-3 rounded-2xl bg-surface-2 px-4 py-3">
+                <span className="min-w-0 text-sm">
+                  <span className="text-muted">{cap(dayLabel(x.date, t))} {x.time}</span> · {typeInfo(x.type).emoji} <b>{x.title}</b>
+                </span>
+                <MoveSession session={mv(x)} today={t} className="shrink-0 px-3 py-1.5 text-xs" />
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
+      {/* PROCHAINE SÉANCE + SEMAINE */}
+      <div className="mb-4 grid gap-4 lg:grid-cols-5">
+        <section className="glow rounded-3xl border border-line p-5 sm:p-6 lg:col-span-3">
+          <div className="mb-4 flex flex-wrap items-center gap-2 text-sm font-semibold">
+            <Sparkles size={16} className="text-accent" />
+            {hero ? (heroToday ? "Séance du jour" : "Prochaine séance") : "Séance suggérée"}
+            {hero && (
+              <span className="chip ml-auto">
+                <Clock size={12} /> {cap(dayLabel(hero.date, t))} · {hero.time}
+                {!heroToday && ` · dans ${diffDays(hero.date, t)} j`}
+              </span>
+            )}
+          </div>
+
+          {hero && !heroToday && (
+            <p className="mb-4 rounded-xl bg-surface-2 p-3 text-xs text-ink-2">
+              {doneToday.length
+                ? "Séance du jour faite ✅ Bien joué, profite de la récup."
+                : "Rien de prévu aujourd'hui 😌 La récupération fait partie du programme."}
+              {!doneToday.length && (
+                <> <Link href="/workouts/new?template=mobility" className="text-accent">Mobilité douce (facultatif)</Link></>
+              )}
+            </p>
+          )}
+
+          <div className="flex items-start gap-4">
+            <div className="text-5xl">{typeInfo(hero?.type ?? suggested.template.type).emoji}</div>
+            <div className="min-w-0 flex-1">
+              <h2 className="text-2xl font-bold tracking-tight">{hero?.title ?? suggested.template.title}</h2>
+              <p className="mt-1 text-sm text-ink-2">
+                {template ? `${template.focus} · ` : `${typeInfo(hero!.type).label} · `}
+                {hero?.durationMin ?? suggested.template.durationMin} min
+                {(hero ? hero.rpe ?? template?.rpe : suggested.template.rpe) ? ` · RPE ${hero ? hero.rpe ?? template?.rpe : suggested.template.rpe}` : ""}
+              </p>
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                {hero?.source === "coach" && <span className="chip">🧠 Coach</span>}
+                {hero?.movedFrom && <span className="chip">🔁 Décalée du {dayLabel(hero.movedFrom, t)}</span>}
+              </div>
+            </div>
+          </div>
+
+          {(hero ? hero.notes : suggested.reason) && (
+            <p className="mt-4 rounded-xl bg-surface-2 p-3 text-xs text-ink-2">💡 {hero ? hero.notes : suggested.reason}</p>
+          )}
+
+          {template && (
+            <ul className="mt-4 space-y-1 text-sm">
+              {template.exercises.slice(0, 5).map((e) => (
+                <li key={e.name} className="flex justify-between gap-2">
+                  <span className="truncate">{e.name}</span>
+                  <span className="shrink-0 font-mono text-xs text-muted">{e.sets}×{e.reps}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+
+          <div className="mt-5 flex flex-wrap gap-2">
+            {hero ? (
+              <>
+                {heroToday ? (
+                  <Link href={`${sessionHref(hero)}&live=1`} className="btn-primary">C&apos;est parti</Link>
+                ) : (
+                  <Link href={sessionHref(hero)} className="btn-ghost">La faire maintenant</Link>
+                )}
+                <MoveSession session={mv(hero)} today={t} />
+              </>
+            ) : (
+              <>
+                <Link href={`/workouts/new?template=${suggested.template.id}&live=1`} className="btn-primary">C&apos;est parti</Link>
+                <Link href="/planning" className="btn-ghost"><CalendarPlus size={14} /> Planifier mes séances</Link>
+              </>
+            )}
+          </div>
+          <div className="mt-4">
+            <CoachVideo result={coachVideo} />
+          </div>
+          {!hero && !equipmentKnown && (
+            <p className="mt-3 text-xs text-muted">
+              Suggestions sans matériel pour l&apos;instant.{" "}
+              <Link href="/planning#coach" className="text-accent">Indique ton matériel</Link> (salle, haltères…) pour des séances adaptées.
+            </p>
+          )}
+        </section>
+
+        <div className="flex flex-col gap-4 lg:col-span-2">
+          {/* Ma semaine */}
+          <section className="card">
+            <div className="mb-3 flex items-baseline justify-between text-sm font-semibold">
+              <span>Ma semaine</span>
+              <span className="font-mono text-xs text-ink-2 tabular-nums">{s.current.sessions}/{target} séances</span>
+            </div>
+            <Progress value={s.current.sessions / Math.max(1, target)} />
+            <div className="mt-4 grid grid-cols-7 gap-1 text-center">
+              {week.map((d) => (
+                <div key={d.date} className={`rounded-2xl px-0.5 py-2 ${d.date === t ? "bg-accent/10 ring-1 ring-accent/40" : ""}`}>
+                  <div className="text-[10px] text-muted uppercase">{WEEKDAYS[isoWeekday(d.date) - 1].slice(0, 3)}</div>
+                  <div className="font-mono text-sm font-semibold tabular-nums">{Number(d.date.slice(8))}</div>
+                  <div className="mt-1 flex min-h-6 flex-col items-center gap-0.5 text-sm leading-none">
+                    {d.planned.map((x) => (
+                      <span
+                        key={x.key}
+                        title={`${x.time} · ${x.title}${x.done ? " (faite)" : x.date < t ? " (manquée)" : ""}`}
+                        className={x.done ? "" : x.date < t ? "opacity-40 grayscale" : "opacity-70"}
+                      >
+                        {x.done ? "✅" : x.date < t ? "✖️" : typeInfo(x.type).emoji}
+                      </span>
+                    ))}
+                    {d.extra > 0 && <span title="Séance en plus">💪</span>}
+                    {!d.planned.length && !d.extra && <span className="text-muted">·</span>}
+                  </div>
+                </div>
+              ))}
+            </div>
+            <p className="mt-3 text-[11px] text-muted">✅ faite · ✖️ manquée · emoji = prévue · 💪 en plus</p>
+          </section>
+
+          {/* À venir */}
+          <section className="card flex-1">
+            <div className="mb-3 flex items-center justify-between text-sm font-semibold">
+              <span className="inline-flex items-center gap-2"><CalendarDays size={16} className="text-accent" /> À venir</span>
+              <Link href="/planning" className="inline-flex items-center text-xs font-normal text-muted hover:text-ink">Planning <ChevronRight size={14} /></Link>
+            </div>
+            {upcoming.length ? (
+              <ul className="space-y-2">
+                {upcoming.map((x) => (
+                  <li key={x.key} className="flex items-center gap-3 rounded-2xl bg-surface-2 px-3 py-2.5">
+                    <div className="w-12 shrink-0 text-center">
+                      <div className="text-[10px] text-muted uppercase">{x.date === t ? "Auj." : WEEKDAYS[isoWeekday(x.date) - 1].slice(0, 3)}</div>
+                      <div className="font-mono text-base font-semibold tabular-nums">{Number(x.date.slice(8))}</div>
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate text-sm font-medium">{typeInfo(x.type).emoji} {x.title}</div>
+                      <div className="text-xs text-muted">
+                        {x.time} · {x.durationMin} min{x.movedFrom ? " · 🔁 décalée" : ""}
+                      </div>
+                    </div>
+                    <MoveSession session={mv(x)} today={t} label="" className="shrink-0 px-2.5 py-1.5 text-xs" />
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="text-sm text-muted">
+                Rien d&apos;autre de prévu.{" "}
+                <Link href="/planning" className="text-accent">Ajoute tes créneaux</Link> ou laisse le coach planifier ta semaine.
+              </p>
+            )}
+          </section>
+        </div>
+      </div>
+
+      {/* Forme */}
+      <section className="card mb-4">
         <div className="flex flex-col items-center gap-6 sm:flex-row sm:items-center">
           <div className="flex flex-col items-center">
-            <ScoreRing score={s.score} />
+            <ScoreRing score={s.score} size={120} />
             <span className="mt-2 text-xs font-medium tracking-wide text-muted uppercase">Score de forme</span>
           </div>
           <div className="w-full flex-1 space-y-3">
@@ -172,77 +342,10 @@ export default async function Dashboard({ searchParams }: PageProps<"/">) {
         );
       })()}
 
-      <div className="mb-4 grid gap-4 lg:grid-cols-5">
-        {/* Suggestion */}
-        <section className="card lg:col-span-2">
-          <div className="mb-3 flex items-center gap-2 text-sm font-semibold">
-            <Sparkles size={16} className="text-accent" /> {cardTitle}
-          </div>
-          <div className="text-3xl">{typeInfo(template.type).emoji}</div>
-          <h3 className="mt-2 text-lg font-bold">{template.title}</h3>
-          <p className="text-sm text-ink-2">{template.focus} · {coachToday?.durationMin ?? template.durationMin} min · RPE {coachToday?.rpe ?? template.rpe}</p>
-          <p className="mt-3 rounded-xl bg-surface-2 p-3 text-xs text-ink-2">💡 {reason}</p>
-          <ul className="mt-3 space-y-1 text-sm">
-            {template.exercises.slice(0, 5).map((e) => (
-              <li key={e.name} className="flex justify-between gap-2">
-                <span className="truncate">{e.name}</span>
-                <span className="shrink-0 font-mono text-xs text-muted">{e.sets}×{e.reps}</span>
-              </li>
-            ))}
-          </ul>
-          <div className="mt-4 flex flex-wrap gap-2">
-            {restDay ? (
-              <>
-                <Link href="/planning#coach" className="btn-primary">Voir le programme</Link>
-                <Link href={startHref} className="btn-ghost">Mobilité {template.durationMin} min (facultatif)</Link>
-              </>
-            ) : (
-              <Link href={`${startHref}&live=1`} className="btn-primary">C&apos;est parti</Link>
-            )}
-          </div>
-          <div className="mt-4">
-            <CoachVideo result={coachVideo} />
-          </div>
-          {!coachTpl && !restDay && !equipmentKnown && (
-            <p className="mt-3 text-xs text-muted">
-              Suggestions sans matériel pour l&apos;instant.{" "}
-              <Link href="/planning#coach" className="text-accent">Indique ton matériel</Link> (salle, haltères…) pour des séances adaptées.
-            </p>
-          )}
-        </section>
-
-        {/* Graph semaines */}
-        <section className="card lg:col-span-3">
-          <div className="mb-3 text-sm font-semibold">Minutes par semaine</div>
-          <WeeklyChart data={weekData} />
-        </section>
-      </div>
-
-      {/* Aujourd'hui */}
-      {(todayPlans.length > 0 || doneToday.length > 0) && (
-        <section className="card mb-4">
-          <div className="mb-3 flex items-center gap-2 text-sm font-semibold">
-            <CalendarCheck2 size={16} className="text-accent" /> Aujourd&apos;hui
-          </div>
-          <ul className="space-y-2">
-            {todayPlans.map((p) => {
-              const done = doneToday.some((w) => typeInfo(w.type).category === typeInfo(p.type).category);
-              return (
-                <li key={p.id} className="flex items-center justify-between gap-3 rounded-2xl bg-surface-2 px-4 py-3">
-                  <span className="text-sm">
-                    {done ? "✅" : "⏳"} <b>{p.time}</b> · {typeInfo(p.type).emoji} {p.title}
-                  </span>
-                  {!done && <Link href={planHref(p)} className="btn-primary px-3 py-1.5 text-xs">Valider</Link>}
-                </li>
-              );
-            })}
-            {todayPlans.length === 0 &&
-              doneToday.map((w) => (
-                <li key={w.id} className="rounded-2xl bg-surface-2 px-4 py-3 text-sm">✅ {typeInfo(w.type).emoji} {w.title} · {w.durationMin} min</li>
-              ))}
-          </ul>
-        </section>
-      )}
+      <section className="card mb-4">
+        <div className="mb-3 text-sm font-semibold">Minutes par semaine</div>
+        <WeeklyChart data={weekData} />
+      </section>
 
       <div className="mb-4 grid gap-4 lg:grid-cols-2">
         <section className="card">

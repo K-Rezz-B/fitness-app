@@ -43,6 +43,13 @@
       "when": 1793908220294,
       "tag": "0005_defis",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1794042036573,
+      "tag": "0006_plan_moves",
+      "breakpoints": true
     }
   ]
 }

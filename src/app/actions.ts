@@ -5,8 +5,9 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { and, eq, isNull, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { plans, profile, videos, weights, workouts, type Exercise, type Workout } from "@/lib/schema";
-import { getWorkouts } from "@/lib/data";
+import { planMoves, plans, profile, videos, weights, workouts, type Exercise, type Workout } from "@/lib/schema";
+import { getPlan, getWorkouts } from "@/lib/data";
+import { diffDays, isoWeekday, today } from "@/lib/dates";
 import { computeStats } from "@/lib/stats";
 import { newBadges } from "@/lib/notifications";
 import { detectRecords, exerciseIndex, exerciseMemos } from "@/lib/records";
@@ -288,6 +289,43 @@ export async function togglePlan(f: FormData) {
       .update(plans)
       .set({ active: sql`not ${plans.active}`, updatedAt: new Date() })
       .where(and(eq(plans.id, id), eq(plans.profileId, pid)));
+  revalidateAll();
+}
+
+/**
+ * Décale (ou saute, `toDate` = "skip") une seule séance : l'occurrence `planId` du `fromDate`,
+ * ou une séance déjà décalée (`moveId`). Le créneau hebdo, lui, ne bouge pas.
+ */
+export async function moveSession(f: FormData) {
+  const pid = await currentPid();
+  const t = today();
+  const isDay = (v: string) => /^\d{4}-\d{2}-\d{2}$/.test(v);
+  const fromDate = str(f, "fromDate");
+  const skip = str(f, "toDate") === "skip";
+  const toDate = skip ? null : str(f, "toDate");
+  const toTime = str(f, "toTime");
+  if (!isDay(fromDate) || diffDays(fromDate, t) < -14 || diffDays(fromDate, t) > 60) throw new Error("Séance introuvable");
+  if (toDate !== null && (!isDay(toDate) || toDate < t || diffDays(toDate, t) > 30)) throw new Error("Date invalide");
+  if (!/^\d{2}:\d{2}$/.test(toTime)) throw new Error("Heure invalide");
+
+  const moveId = Number(f.get("moveId"));
+  if (Number.isInteger(moveId) && moveId > 0) {
+    await db.update(planMoves).set({ toDate, toTime }).where(and(eq(planMoves.id, moveId), eq(planMoves.profileId, pid)));
+  } else {
+    const plan = await getPlan(pid, Number(f.get("planId")));
+    if (!plan || plan.weekday !== isoWeekday(fromDate)) throw new Error("Séance introuvable");
+    const [existing] = await db
+      .select({ id: planMoves.id })
+      .from(planMoves)
+      .where(and(eq(planMoves.profileId, pid), eq(planMoves.planId, plan.id), eq(planMoves.fromDate, fromDate)));
+    if (existing) await db.update(planMoves).set({ toDate, toTime }).where(eq(planMoves.id, existing.id));
+    else
+      await db.insert(planMoves).values({
+        profileId: pid, planId: plan.id, fromDate, toDate, toTime,
+        title: plan.title, type: plan.type, durationMin: plan.durationMin, source: plan.source,
+        templateId: plan.templateId, rpe: plan.rpe, notes: plan.notes,
+      });
+  }
   revalidateAll();
 }
 
