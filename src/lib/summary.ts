@@ -1,10 +1,10 @@
 import "server-only";
-import { getActivity, getPlans, getWorkouts } from "./data";
+import { getActivity, getPlanMoves, getPlans, getWorkouts } from "./data";
 import { computeStats } from "./stats";
 import { remainingThisWeek } from "./notifications";
-import { upcomingPlan } from "./coach-plan";
+import { nextSession, sessionsBetween } from "./schedule";
 import { TZ, WEEKDAYS, typeInfo } from "./constants";
-import { dayKey, isoWeekday, today } from "./dates";
+import { addDays, dayKey, diffDays, isoWeekday, today } from "./dates";
 import type { Profile } from "./schema";
 
 const nowHHMM = () =>
@@ -12,22 +12,21 @@ const nowHHMM = () =>
 
 /** Résumé compact du profil pour le widget (Scriptable) et les intégrations. */
 export async function buildSummary(p: Profile, origin: string) {
-  const [all, plans, activity] = await Promise.all([getWorkouts(p.id), getPlans(p.id), getActivity(p.id, 1)]);
+  const [all, plans, moves, activity] = await Promise.all([getWorkouts(p.id), getPlans(p.id), getPlanMoves(p.id), getActivity(p.id, 1)]);
   const s = computeStats(all, p.weeklySessionsTarget);
   const t = today();
-  const wd = isoWeekday(t);
   const hhmm = nowHHMM();
-  const active = plans.filter((x) => x.active);
   const doneToday = all.filter((w) => dayKey(w.date) === t);
-  const sameCat = (a: string, b: string) => typeInfo(a).category === typeInfo(b).category;
+  // Séances datées (créneaux hebdo + séances décalées) sur les 8 prochains jours
+  const sessions = sessionsBetween(plans, moves, all, t, addDays(t, 7));
 
-  const todayPlans = active
-    .filter((x) => x.weekday === wd)
-    .map((x) => ({ time: x.time, title: x.title, emoji: typeInfo(x.type).emoji, done: doneToday.some((w) => sameCat(w.type, x.type)) }));
+  const todayPlans = sessions
+    .filter((x) => x.date === t)
+    .map((x) => ({ time: x.time, title: x.title, emoji: typeInfo(x.type).emoji, done: x.done }));
 
-  // Prochain créneau à venir (dans les 7 jours, aujourd'hui après l'heure actuelle inclus)
-  const next = upcomingPlan(active, wd, hhmm);
-  const upcoming = next ? { x: next.plan, inDays: next.inDays } : undefined;
+  // Prochaine séance à venir (aujourd'hui après l'heure actuelle incluse)
+  const next = nextSession(sessions, t, hhmm);
+  const upcoming = next ? { x: next, inDays: diffDays(next.date, t) } : undefined;
 
   const last = all[0];
   return {
@@ -46,7 +45,7 @@ export async function buildSummary(p: Profile, origin: string) {
           title: upcoming.x.title,
           emoji: typeInfo(upcoming.x.type).emoji,
           time: upcoming.x.time,
-          day: upcoming.inDays === 0 ? "Aujourd'hui" : upcoming.inDays === 1 ? "Demain" : WEEKDAYS[upcoming.x.weekday - 1],
+          day: upcoming.inDays === 0 ? "Aujourd'hui" : upcoming.inDays === 1 ? "Demain" : WEEKDAYS[isoWeekday(upcoming.x.date) - 1],
           inDays: upcoming.inDays,
         }
       : null,

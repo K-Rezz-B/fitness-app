@@ -1,6 +1,7 @@
 import { db } from "@/lib/db";
 import { pushSubscriptions } from "@/lib/schema";
-import { getPlans, getWorkouts, listProfiles } from "@/lib/data";
+import { getPlanMoves, getPlans, getWorkouts, listProfiles } from "@/lib/data";
+import { sessionsBetween } from "@/lib/schedule";
 import { computeStats } from "@/lib/stats";
 import { dailyMessage, type PushPayload } from "@/lib/notifications";
 import { pushConfigured, sendToProfile } from "@/lib/push";
@@ -9,7 +10,7 @@ import { PHASES, type WeekPlan } from "@/lib/planner";
 import { safeEqual } from "@/lib/auth";
 import { json } from "@/lib/api-auth";
 import { addDays, dayKey, isoWeekday, today, weekStart } from "@/lib/dates";
-import { WEEKDAYS, typeInfo } from "@/lib/constants";
+import { WEEKDAYS } from "@/lib/constants";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -55,14 +56,12 @@ export async function GET(req: Request) {
   const subscribed = new Set((await db.select({ id: pushSubscriptions.profileId }).from(pushSubscriptions)).map((r) => r.id));
   const results = [];
   for (const p of profiles.filter((x) => subscribed.has(x.id))) {
-    const [all, plans] = await Promise.all([getWorkouts(p.id), getPlans(p.id)]);
+    const [all, plans, moves] = await Promise.all([getWorkouts(p.id), getPlans(p.id), getPlanMoves(p.id)]);
     const s = computeStats(all, p.weeklySessionsTarget);
     const doneToday = all.filter((w) => dayKey(w.date) === t);
     const plannedToday = replanned.has(p.id)
       ? [] // les créneaux viennent d'être remplacés par ceux de la semaine prochaine
-      : plans
-          .filter((x) => x.active && x.weekday === weekday)
-          .filter((x) => !doneToday.some((w) => typeInfo(w.type).category === typeInfo(x.type).category));
+      : sessionsBetween(plans, moves, all, t, t).filter((x) => !x.done);
     const msgs = [
       dailyMessage(s, { weekday, workedOutToday: doneToday.length > 0, plannedToday, notifyStreak: p.notifyStreak, notifyWeekly: p.notifyWeekly }),
       replanned.has(p.id) ? planMessage(replanned.get(p.id)!) : null,

@@ -1,4 +1,4 @@
-import type { Plan } from "./schema";
+import type { Plan, PlanMove } from "./schema";
 import { typeInfo } from "./constants";
 import { addDays, isoWeekday, today } from "./dates";
 
@@ -51,8 +51,11 @@ const VTIMEZONES: Record<string, string[]> = {
   ],
 };
 
-/** `details` : lignes ajoutées à la description (ex. exercices prescrits par le coach), par id de créneau. */
-export function buildCalendar(plans: Plan[], tz: string, appUrl?: string, owner?: string, details?: Map<number, string[]>): string {
+/**
+ * `details` : lignes ajoutées à la description (ex. exercices prescrits par le coach), par id de créneau.
+ * `moves` : séances décalées/sautées → l'occurrence d'origine est exclue (EXDATE), la nouvelle date devient un événement ponctuel.
+ */
+export function buildCalendar(plans: Plan[], tz: string, appUrl?: string, owner?: string, details?: Map<number, string[]>, moves: PlanMove[] = []): string {
   const t = today();
   const vtz = VTIMEZONES[tz];
   const dt = (name: string, value: string) => (vtz ? `${name};TZID=${tz}:${value}` : `${name}:${value}`);
@@ -85,6 +88,7 @@ export function buildCalendar(plans: Plan[], tz: string, appUrl?: string, owner?
       dt("DTSTART", local(first, p.time)),
       dt("DTEND", endOf(first, p.time, p.durationMin)),
       `RRULE:FREQ=WEEKLY;BYDAY=${BYDAY[p.weekday]}`,
+      ...moves.filter((m) => m.planId === p.id).map((m) => dt("EXDATE", local(m.fromDate, p.time))),
       `SUMMARY:${esc(`${info.emoji} ${p.title}`)}`,
       `DESCRIPTION:${esc(`${p.source === "coach" ? "Prévue par ton coach" : "Séance obligatoire"} · ${info.label} · ${p.durationMin} min${p.rpe ? ` · RPE ${p.rpe}` : ""}${extra?.length ? `\n\n${extra.join("\n")}` : ""}${link ? `\n\nLogger la séance : ${link}` : ""}`)}`,
       ...(link ? [`URL:${link}`] : []),
@@ -103,6 +107,31 @@ export function buildCalendar(plans: Plan[], tz: string, appUrl?: string, owner?
       );
     }
     lines.push("END:VEVENT");
+  }
+  for (const m of moves.filter((m) => m.toDate && m.toDate >= addDays(t, -7))) {
+    const day = m.toDate!;
+    const info = typeInfo(m.type);
+    const link = appUrl ? (m.source === "coach" && m.planId && m.templateId ? `${appUrl}/workouts/new?plan=${m.planId}` : `${appUrl}/workouts/new?type=${m.type}`) : null;
+    const extra = m.planId ? details?.get(m.planId) : undefined;
+    lines.push(
+      "BEGIN:VEVENT",
+      `UID:move-${m.id}@fitpulse`,
+      `DTSTAMP:${stamp(m.createdAt)}`,
+      dt("DTSTART", local(day, m.toTime)),
+      dt("DTEND", endOf(day, m.toTime, m.durationMin)),
+      `SUMMARY:${esc(`${info.emoji} ${m.title} (décalée)`)}`,
+      `DESCRIPTION:${esc(`Séance décalée · ${info.label} · ${m.durationMin} min${m.rpe ? ` · RPE ${m.rpe}` : ""}${extra?.length ? `\n\n${extra.join("\n")}` : ""}${link ? `\n\nLogger la séance : ${link}` : ""}`)}`,
+      ...(link ? [`URL:${link}`] : []),
+      "CATEGORIES:Sport",
+      "STATUS:CONFIRMED",
+      "TRANSP:OPAQUE",
+      "BEGIN:VALARM",
+      "ACTION:DISPLAY",
+      `DESCRIPTION:${esc(`C'est l'heure : ${m.title} 💪`)}`,
+      "TRIGGER:PT0M",
+      "END:VALARM",
+      "END:VEVENT",
+    );
   }
   lines.push("END:VCALENDAR");
   return lines.map(fold).join("\r\n") + "\r\n";

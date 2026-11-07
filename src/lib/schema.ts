@@ -118,6 +118,27 @@ export const plans = pgTable("plans", {
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 }, (t) => [index("plans_profile_idx").on(t.profileId)]);
 
+/**
+ * Séance décalée : une occurrence d'un créneau (`planId` le `fromDate`) déplacée au `toDate` à `toTime`,
+ * ou annulée (`toDate` null). La séance est recopiée pour survivre à la re-planification du coach.
+ */
+export const planMoves = pgTable("plan_moves", {
+  id: serial("id").primaryKey(),
+  profileId: profileId(),
+  planId: integer("plan_id").references(() => plans.id, { onDelete: "set null" }),
+  fromDate: date("from_date").notNull(),
+  toDate: date("to_date"),
+  toTime: text("to_time").notNull(),
+  title: text("title").notNull(),
+  type: text("type").notNull(),
+  durationMin: integer("duration_min").notNull(),
+  source: text("source").notNull().default("manual"),
+  templateId: text("template_id"),
+  rpe: smallint("rpe"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [index("plan_moves_profile_idx").on(t.profileId, t.toDate)]);
+
 /** Activité quotidienne importée d'Apple Santé (app Forme) : pas, énergie active, distance… */
 export const dailyActivity = pgTable("daily_activity", {
   id: serial("id").primaryKey(),
@@ -172,6 +193,7 @@ export type Profile = typeof profile.$inferSelect;
 export type Weight = typeof weights.$inferSelect;
 export type Workout = typeof workouts.$inferSelect;
 export type Plan = typeof plans.$inferSelect;
+export type PlanMove = typeof planMoves.$inferSelect;
 export type Video = typeof videos.$inferSelect;
 export type PushSubscriptionRow = typeof pushSubscriptions.$inferSelect;
 export type Passkey = typeof passkeys.$inferSelect;

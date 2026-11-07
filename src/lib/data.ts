@@ -1,8 +1,8 @@
 import "server-only";
 import { cache } from "react";
-import { and, asc, desc, eq, gte, inArray, lt } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, lt, or } from "drizzle-orm";
 import { db } from "./db";
-import { dailyActivity, passkeys, plans, profile, pushSubscriptions, videos, weights, workouts } from "./schema";
+import { dailyActivity, passkeys, planMoves, plans, profile, pushSubscriptions, videos, weights, workouts } from "./schema";
 import { addDays, dayKey, today, weekStart } from "./dates";
 
 /** Toutes les lectures sont filtrées par profil : le paramètre `pid` est obligatoire. */
@@ -17,6 +17,14 @@ export const getPlan = async (pid: number, id: number) =>
   (await db.select().from(plans).where(and(eq(plans.id, id), eq(plans.profileId, pid))))[0];
 export const getPlans = (pid: number) =>
   db.select().from(plans).where(eq(plans.profileId, pid)).orderBy(asc(plans.weekday), asc(plans.time));
+/** Séances décalées ou sautées récentes (origine ou destination dans les 60 derniers jours ou à venir) */
+export const getPlanMoves = (pid: number) => {
+  const since = addDays(today(), -60);
+  return db
+    .select()
+    .from(planMoves)
+    .where(and(eq(planMoves.profileId, pid), or(gte(planMoves.fromDate, since), gte(planMoves.toDate, since))));
+};
 export const getVideos = (pid: number) =>
   db.select().from(videos).where(eq(videos.profileId, pid)).orderBy(desc(videos.favorite), desc(videos.createdAt), desc(videos.id));
 export const getPasskeys = (pid: number) =>
